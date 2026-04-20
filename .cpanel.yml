@@ -1,0 +1,11 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home1/de2shrnx/pro.easi7.in/
+    - /bin/cp -R . $DEPLOYPATH
+    - /bin/rm -f "$DEPLOYPATH/.cpanel.yml"
+    - /bin/rm -f "$DEPLOYPATH/db.sql"
+    - /bin/chmod 755 $DEPLOYPATH
+    - /bin/chmod -R 644 $DEPLOYPATH/*.php
+    - /bin/chmod -R 644 $DEPLOYPATH/api/*.php
+    - /bin/chmod -R 644 $DEPLOYPATH/includes/*.php
