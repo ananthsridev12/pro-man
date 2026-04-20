@@ -106,7 +106,7 @@ foreach ($payload['sheets'] as $sheet) {
                 $campIdText = 'CAMP-' . str_pad($num, 3, '0', STR_PAD_LEFT);
             }
 
-            $e = fn($v) => $db->real_escape_string($v);
+            $e = function($v) use ($db) { return $db->real_escape_string((string)$v); };
             $db->query("INSERT INTO campaigns
                 (campaign_id, campaign_name, vertical, goal_code, campaign_goal, target_audience,
                  geography, campaign_type, campaign_start, campaign_end, go_live_date,
@@ -177,7 +177,7 @@ foreach ($payload['sheets'] as $sheet) {
                 }
             }
 
-            $e = fn($v) => $db->real_escape_string((string)$v);
+            $e = function($v) use ($db) { return $db->real_escape_string((string)$v); };
             $db->query("INSERT INTO assets
                 (asset_type, asset_name, asset_id, campaign_ref, campaign_id_text, vertical,
                  owner, support, requested_by, brief_date, due_date, pub_date,
