@@ -164,16 +164,19 @@ $currentType = $_GET['type'] ?? '';
         </a>
 
         <div class="nav-section mt-2">Asset Trackers</div>
-        <?php foreach ($ASSET_TYPES as $type => $cfg): ?>
-        <a href="assets.php?type=<?= $type ?>"
-           class="<?= ($currentPage==='assets.php' && $currentType===$type)?'active':'' ?>"
+        <?php foreach ($ASSET_TYPES as $navType => $navCfg): ?>
+        <a href="assets.php?type=<?= $navType ?>"
+           class="<?= ($currentPage==='assets.php' && $currentType===$navType)?'active':'' ?>"
            onclick="closeSidebar()">
-            <span class="dot" style="background:<?= $cfg['color'] ?>;"></span>
-            <?= $cfg['label'] ?>
+            <span class="dot" style="background:<?= $navCfg['color'] ?>;"></span>
+            <?= $navCfg['label'] ?>
         </a>
         <?php endforeach; ?>
 
         <div class="nav-section mt-2">Tools</div>
+        <a href="users.php" class="<?= $currentPage==='users.php'?'active':'' ?>">
+            <i class="fa fa-users fa-fw"></i> Users &amp; Roles
+        </a>
         <a href="upload.php" class="<?= $currentPage==='upload.php'?'active':'' ?>">
             <i class="fa fa-file-excel fa-fw"></i> Import Excel
         </a>

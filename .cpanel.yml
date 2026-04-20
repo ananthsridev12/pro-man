@@ -2,7 +2,9 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home1/de2shrnx/pro.easi7.in/
+    - test -f "$DEPLOYPATH/config.php" && /bin/cp "$DEPLOYPATH/config.php" /tmp/proman_cfg.php || true
     - /bin/cp -R . $DEPLOYPATH
+    - test -f /tmp/proman_cfg.php && /bin/cp /tmp/proman_cfg.php "$DEPLOYPATH/config.php" && /bin/rm -f /tmp/proman_cfg.php || true
     - /bin/rm -f "$DEPLOYPATH/.cpanel.yml"
     - /bin/rm -f "$DEPLOYPATH/db.sql"
     - /bin/chmod 755 $DEPLOYPATH

@@ -12,6 +12,7 @@ $campaigns = $db->query("
     LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0
     GROUP BY c.id ORDER BY c.created_at DESC
 ");
+$activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name ASC");
 
 include 'includes/header.php';
 ?>
@@ -151,7 +152,12 @@ include 'includes/header.php';
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Campaign Owner</label>
-                            <input type="text" class="form-control" name="campaign_owner" id="cOwner">
+                            <select class="form-select" name="campaign_owner" id="cOwner">
+                                <option value="">-- Select User --</option>
+                                <?php $activeUsers->data_seek(0); while ($u = $activeUsers->fetch_assoc()): ?>
+                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?> <small>(<?= htmlspecialchars($u['role']) ?>)</small></option>
+                                <?php endwhile; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Campaign Status</label>

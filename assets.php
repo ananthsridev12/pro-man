@@ -27,7 +27,10 @@ $assets = $db->query("
     WHERE $where ORDER BY a.due_date ASC, a.priority DESC, a.created_at DESC
 ");
 
-$campaigns = $db->query("SELECT id, campaign_id, campaign_name FROM campaigns ORDER BY campaign_id");
+$campaigns  = $db->query("SELECT id, campaign_id, campaign_name FROM campaigns ORDER BY campaign_id");
+$activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name ASC");
+$userOpts = [];
+if ($activeUsers) { while ($u = $activeUsers->fetch_assoc()) $userOpts[] = $u; }
 
 include 'includes/header.php';
 ?>
@@ -177,15 +180,30 @@ include 'includes/header.php';
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Owner</label>
-                            <input type="text" class="form-control" name="owner" id="aOwner">
+                            <select class="form-select" name="owner" id="aOwner">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($userOpts as $u): ?>
+                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Support</label>
-                            <input type="text" class="form-control" name="support" id="aSupport">
+                            <select class="form-select" name="support" id="aSupport">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($userOpts as $u): ?>
+                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Requested By</label>
-                            <input type="text" class="form-control" name="requested_by" id="aReqBy">
+                            <select class="form-select" name="requested_by" id="aReqBy">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($userOpts as $u): ?>
+                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Brief Date</label>
@@ -253,7 +271,14 @@ include 'includes/header.php';
                     <?php foreach ($cfg['extra'] as $key => $label): ?>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold"><?= htmlspecialchars($label) ?></label>
-                            <?php if (in_array($key, ['brief_desc','body_copy','on_page_changes','topic'])): ?>
+                            <?php if (in_array($key, ['content_writer','designer','dev_owner','speakers'])): ?>
+                                <select class="form-select form-select-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
+                                    <option value="">-- Select --</option>
+                                    <?php foreach ($userOpts as $u): ?>
+                                        <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php elseif (in_array($key, ['brief_desc','body_copy','on_page_changes','topic'])): ?>
                                 <textarea class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>" rows="2"></textarea>
                             <?php elseif (in_array($key, ['seo_optimised','cms_published','gating','ab_test','tracking_impl','results_defined','followup_sent'])): ?>
                                 <select class="form-select form-select-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
