@@ -10,16 +10,16 @@ if ($action === 'delete') {
     if (!$id) { echo json_encode(['success'=>false,'message'=>'Invalid ID']); exit; }
     $db->query("DELETE FROM campaigns WHERE id=$id");
     echo json_encode(['success' => $db->affected_rows > 0]);
-    exit;
+    $db->close(); exit;
 }
 
-$id            = (int)($_POST['id'] ?? 0);
-$name          = trim($_POST['campaign_name'] ?? '');
+$id   = (int)($_POST['id'] ?? 0);
+$name = trim($_POST['campaign_name'] ?? '');
 if (!$name) { echo json_encode(['success'=>false,'message'=>'Campaign name is required']); exit; }
 
 $fields = ['vertical','goal_code','campaign_goal','target_audience','geography','campaign_type',
            'campaign_start','campaign_end','go_live_date','priority','campaign_owner',
-           'campaign_status','approved_project_head','approved_manager','notes'];
+           'campaign_status','approved_project_head','approved_manager','notes','descriptor'];
 
 $sets = ["campaign_name='" . $db->real_escape_string($name) . "'"];
 foreach ($fields as $f) {
@@ -35,14 +35,27 @@ if ($id) {
     $db->query("UPDATE campaigns SET " . implode(',', $sets) . " WHERE id=$id");
     echo json_encode(['success' => true, 'id' => $id]);
 } else {
-    // Auto-generate campaign_id: CAMP-001, CAMP-002 ...
-    $last = $db->query("SELECT campaign_id FROM campaigns ORDER BY id DESC LIMIT 1")->fetch_assoc();
-    $num  = 1;
-    if ($last && preg_match('/CAMP-(\d+)/', $last['campaign_id'] ?? '', $m)) $num = (int)$m[1] + 1;
-    $campId = 'CAMP-' . str_pad($num, 3, '0', STR_PAD_LEFT);
-    $sets[] = "campaign_id='" . $db->real_escape_string($campId) . "'";
+    // Build Campaign ID: [VERTICAL]-[GOAL_CODE]-[DESCRIPTOR]-[MON][YY]
+    $vertical   = strtoupper(trim($_POST['vertical']   ?? 'XX'));
+    $goalCode   = strtoupper(trim($_POST['goal_code']  ?? 'LG'));
+    $raw        = strtoupper(str_replace(' ', '-', trim($_POST['descriptor'] ?? '')));
+    $descriptor = preg_replace('/[^A-Z0-9\-]/', '', $raw);
+    if (!$descriptor) $descriptor = 'CAMP';
+    $monYY = strtoupper(date('MY')); // e.g. APR26
+
+    $baseId    = $vertical . '-' . $goalCode . '-' . $descriptor . '-' . $monYY;
+    $candidate = $db->real_escape_string($baseId);
+
+    // Ensure uniqueness — append -2, -3 etc. if collision
+    $suffix = 2;
+    while ($db->query("SELECT id FROM campaigns WHERE campaign_id='$candidate' LIMIT 1")->num_rows > 0) {
+        $candidate = $db->real_escape_string($baseId . '-' . $suffix);
+        $suffix++;
+    }
+
+    $sets[] = "campaign_id='$candidate'";
     $db->query("INSERT INTO campaigns SET " . implode(',', $sets));
-    echo json_encode(['success' => true, 'id' => $db->insert_id, 'campaign_id' => $campId]);
+    echo json_encode(['success' => true, 'id' => $db->insert_id, 'campaign_id' => $candidate]);
 }
 
 $db->close();

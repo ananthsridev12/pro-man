@@ -27,9 +27,9 @@ $assets = $db->query("
     WHERE $where ORDER BY a.due_date ASC, a.priority DESC, a.created_at DESC
 ");
 
-$campaigns  = $db->query("SELECT id, campaign_id, campaign_name FROM campaigns ORDER BY campaign_id");
+$campaigns   = $db->query("SELECT id, campaign_id, campaign_name FROM campaigns ORDER BY campaign_id");
 $activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name ASC");
-$userOpts = [];
+$userOpts    = [];
 if ($activeUsers) { while ($u = $activeUsers->fetch_assoc()) $userOpts[] = $u; }
 
 include 'includes/header.php';
@@ -37,7 +37,7 @@ include 'includes/header.php';
 
 <style>
     .type-badge { display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.82rem;font-weight:500;
-        background: <?= $cfg['color'] ?>20; color: <?= $cfg['color'] ?>; }
+        background: <?= $cfg['color'] ?>18; color: <?= $cfg['color'] ?>; border:1px solid <?= $cfg['color'] ?>30; }
 </style>
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
@@ -78,15 +78,15 @@ include 'includes/header.php';
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:.83rem;">
-                <thead class="table-light">
+            <table class="table table-hover mb-0">
+                <thead class="table-light sticky-top">
                     <tr>
                         <th class="hide-xs">Asset ID</th><th>Asset Name</th><th class="hide-xs">Campaign</th>
-                        <th class="d-none d-md-table-cell">Vertical</th><th class="d-none d-lg-table-cell">Owner</th>
+                        <th class="d-none d-md-table-cell">Owner</th>
                         <?php
-                        $tableExtras = array_slice($cfg['extra'], 0, 3, true);
-                        foreach ($tableExtras as $k => $label): ?>
-                            <th class="d-none d-xl-table-cell"><?= $label ?></th>
+                        $tableExtras = array_slice($cfg['extra'], 0, 2, true);
+                        foreach ($tableExtras as $k => $fld): ?>
+                            <th class="d-none d-xl-table-cell"><?= is_array($fld) ? $fld['label'] : $fld ?></th>
                         <?php endforeach; ?>
                         <th class="d-none d-md-table-cell">Due Date</th><th>Priority</th><th>Status</th>
                         <th class="d-none d-lg-table-cell">PH</th><th class="d-none d-lg-table-cell">Mgr</th>
@@ -102,19 +102,18 @@ include 'includes/header.php';
                 <?php else: while ($a = $assets->fetch_assoc()):
                     $extra = json_decode($a['extra_data'] ?? '{}', true) ?: [];
                     $overdue = $a['due_date'] && strtotime($a['due_date']) < time()
-                        && !in_array($a['status'],['Live','Approved','Cancelled','Archived']);
+                        && !in_array($a['status'],['Published / Live','Approved by Manager','Cancelled']);
                 ?>
                     <tr <?= $overdue?'class="table-danger"':'' ?>>
-                        <td class="hide-xs"><code style="font-size:.75rem;"><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
+                        <td class="hide-xs"><code class="id-code"><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($a['asset_name']) ?></div>
                             <?php if ($a['feedback_notes']): ?>
-                                <small class="text-muted d-none d-sm-inline"><?= htmlspecialchars(substr($a['feedback_notes'],0,40)) ?>...</small>
+                                <small class="text-muted d-none d-sm-inline"><?= htmlspecialchars(substr($a['feedback_notes'],0,40)) ?>…</small>
                             <?php endif; ?>
                         </td>
                         <td class="hide-xs"><small class="text-muted"><?= htmlspecialchars($a['c_campaign_id'] ?? ($a['campaign_id_text'] ?? '-')) ?></small></td>
-                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['vertical'] ?? '-') ?></td>
-                        <td class="d-none d-lg-table-cell"><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
+                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
                         <?php foreach (array_keys($tableExtras) as $k): ?>
                             <td class="d-none d-xl-table-cell"><small><?= htmlspecialchars($extra[$k] ?? '-') ?></small></td>
                         <?php endforeach; ?>
@@ -123,9 +122,10 @@ include 'includes/header.php';
                             <?php if ($overdue): ?><br><small class="text-danger fw-bold">Overdue</small><?php endif; ?>
                         </td>
                         <td><span class="badge-pill pri-<?= $a['priority'] ?>"><?= $a['priority'] ?></span></td>
-                        <td><span class="badge-pill st-<?= str_replace(' ','-',$a['status']) ?>"><?= $a['status'] ?></span></td>
-                        <td class="d-none d-lg-table-cell"><small class="<?= $a['approved_project_head']==='Yes'?'text-success':($a['approved_project_head']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_project_head'] ?></small></td>
-                        <td class="d-none d-lg-table-cell"><small class="<?= $a['approved_manager']==='Yes'?'text-success':($a['approved_manager']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_manager'] ?></small></td>
+                        <td><span class="badge-pill st-<?= str_replace([' ','/'],'_',$a['status']) ?>"><?= $a['status'] ?></span></td>
+                        <?php $aph = $a['approved_project_head']; $amg = $a['approved_manager']; ?>
+                        <td class="d-none d-lg-table-cell"><span class="badge-pill appr-<?= str_replace(' ','-',$aph) ?>"><?= $aph ?></span></td>
+                        <td class="d-none d-lg-table-cell"><span class="badge-pill appr-<?= str_replace(' ','-',$amg) ?>"><?= $amg ?></span></td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-1"
                                 onclick='editAsset(<?= htmlspecialchars(json_encode($a)) ?>)'>
@@ -148,8 +148,10 @@ include 'includes/header.php';
 <div class="modal fade" id="assetModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="assetModalTitle">New <?= rtrim($cfg['label'],'s') ?></h5>
+            <div class="modal-header" style="border-bottom:3px solid <?= $cfg['color'] ?>;">
+                <h5 class="modal-title" id="assetModalTitle" style="color:<?= $cfg['color'] ?>;">
+                    <i class="fa <?= $cfg['icon'] ?> me-2"></i>New <?= rtrim($cfg['label'],'s') ?>
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="assetForm">
@@ -157,9 +159,7 @@ include 'includes/header.php';
                 <input type="hidden" name="id" id="aId">
                 <div class="modal-body">
                     <!-- Common Fields -->
-                    <h6 class="fw-semibold mb-3" style="color:<?= $cfg['color'] ?>;">
-                        <i class="fa <?= $cfg['icon'] ?> me-1"></i> Common Fields
-                    </h6>
+                    <p class="modal-section-title">Common Fields</p>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Asset Name <span class="text-danger">*</span></label>
@@ -176,7 +176,7 @@ include 'includes/header.php';
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Vertical</label>
-                            <input type="text" class="form-control" name="vertical" id="aVertical">
+                            <input type="text" class="form-control" name="vertical" id="aVertical" placeholder="Auto from campaign">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Owner</label>
@@ -214,7 +214,7 @@ include 'includes/header.php';
                             <input type="date" class="form-control" name="due_date" id="aDueDate">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Pub / Go-Live Date</label>
+                            <label class="form-label fw-semibold">Publish / Go-Live Date</label>
                             <input type="date" class="form-control" name="pub_date" id="aPubDate">
                         </div>
                         <div class="col-md-3">
@@ -233,7 +233,7 @@ include 'includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Approved by PH</label>
                             <select class="form-select" name="approved_project_head" id="aApprPH">
                                 <?php foreach ($APPROVAL_OPTS as $o): ?>
@@ -241,8 +241,8 @@ include 'includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-semibold">Approved by Mgr</label>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Approved by Manager</label>
                             <select class="form-select" name="approved_manager" id="aApprMgr">
                                 <?php foreach ($APPROVAL_OPTS as $o): ?>
                                     <option><?= $o ?></option>
@@ -264,30 +264,39 @@ include 'includes/header.php';
                     </div>
 
                     <!-- Type-Specific Fields -->
-                    <h6 class="fw-semibold mb-3" style="color:<?= $cfg['color'] ?>;">
-                        <i class="fa <?= $cfg['icon'] ?> me-1"></i> <?= $cfg['label'] ?> Details
-                    </h6>
+                    <p class="modal-section-title" style="color:<?= $cfg['color'] ?>;">
+                        <i class="fa <?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?> Details
+                    </p>
                     <div class="row g-3">
-                    <?php foreach ($cfg['extra'] as $key => $label): ?>
+                    <?php foreach ($cfg['extra'] as $key => $fld):
+                        $label    = is_array($fld) ? $fld['label'] : $fld;
+                        $isUser   = is_array($fld) && !empty($fld['user']);
+                        $options  = is_array($fld) && !empty($fld['options']) ? $fld['options'] : null;
+                        $isTA     = is_array($fld) && !empty($fld['textarea']);
+                        $isDate   = is_array($fld) && !empty($fld['date']);
+                        $isNumber = is_array($fld) && !empty($fld['number']);
+                    ?>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold"><?= htmlspecialchars($label) ?></label>
-                            <?php if (in_array($key, ['content_writer','designer','dev_owner','speakers'])): ?>
+                            <?php if ($isUser): ?>
                                 <select class="form-select form-select-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
                                     <option value="">-- Select --</option>
                                     <?php foreach ($userOpts as $u): ?>
                                         <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                            <?php elseif (in_array($key, ['brief_desc','body_copy','on_page_changes','topic'])): ?>
-                                <textarea class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>" rows="2"></textarea>
-                            <?php elseif (in_array($key, ['seo_optimised','cms_published','gating','ab_test','tracking_impl','results_defined','followup_sent'])): ?>
+                            <?php elseif ($options): ?>
                                 <select class="form-select form-select-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
-                                    <option value="">--</option>
-                                    <option>Yes</option><option>No</option>
+                                    <option value="">-- Select --</option>
+                                    <?php foreach ($options as $opt): ?>
+                                        <option><?= htmlspecialchars($opt) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
-                            <?php elseif (in_array($key, ['run_start','run_end','event_date'])): ?>
+                            <?php elseif ($isTA): ?>
+                                <textarea class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>" rows="2"></textarea>
+                            <?php elseif ($isDate): ?>
                                 <input type="date" class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
-                            <?php elseif (in_array($key, ['word_count','email_num','duration_mins','expected_att','actual_att','current_rank','target_rank','search_vol','num_pages'])): ?>
+                            <?php elseif ($isNumber): ?>
                                 <input type="number" class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>" min="0">
                             <?php else: ?>
                                 <input type="text" class="form-control form-control-sm" name="extra[<?= $key ?>]" id="extra_<?= $key ?>">
@@ -307,7 +316,8 @@ include 'includes/header.php';
 
 <script>
 function editAsset(a) {
-    document.getElementById('assetModalTitle').textContent = 'Edit Asset';
+    document.getElementById('assetModalTitle').innerHTML =
+        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>Edit Asset';
     document.getElementById('aId').value           = a.id;
     document.getElementById('aName').value          = a.asset_name;
     document.getElementById('aCampaign').value      = a.campaign_ref || '';
@@ -319,13 +329,12 @@ function editAsset(a) {
     document.getElementById('aDueDate').value       = a.due_date || '';
     document.getElementById('aPubDate').value       = a.pub_date || '';
     document.getElementById('aPriority').value      = a.priority || 'Medium';
-    document.getElementById('aStatus').value        = a.status || 'Not Started';
+    document.getElementById('aStatus').value        = a.status || 'Briefed';
     document.getElementById('aApprPH').value        = a.approved_project_head || 'Pending';
     document.getElementById('aApprMgr').value       = a.approved_manager || 'Pending';
     document.getElementById('aRevNo').value         = a.revision_no || 0;
     document.getElementById('aFinalUrl').value      = a.final_file_url || '';
     document.getElementById('aFeedback').value      = a.feedback_notes || '';
-    // Extra fields
     const extra = typeof a.extra_data === 'string' ? JSON.parse(a.extra_data || '{}') : (a.extra_data || {});
     for (const [k, v] of Object.entries(extra)) {
         const el = document.getElementById('extra_' + k);
@@ -337,7 +346,8 @@ function editAsset(a) {
 document.getElementById('assetModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('assetForm').reset();
     document.getElementById('aId').value = '';
-    document.getElementById('assetModalTitle').textContent = 'New Asset';
+    document.getElementById('assetModalTitle').innerHTML =
+        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>New Asset';
 });
 
 document.getElementById('assetForm').addEventListener('submit', function(e) {

@@ -3,22 +3,23 @@ USE pro_man;
 
 CREATE TABLE IF NOT EXISTS campaigns (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    campaign_id VARCHAR(20) UNIQUE,
+    campaign_id VARCHAR(100) UNIQUE,
     campaign_name VARCHAR(255) NOT NULL,
-    vertical VARCHAR(100),
-    goal_code VARCHAR(50),
-    campaign_goal TEXT,
+    vertical VARCHAR(20),
+    goal_code VARCHAR(10),
+    descriptor VARCHAR(100),
+    campaign_goal VARCHAR(100),
     target_audience TEXT,
     geography VARCHAR(100),
     campaign_type VARCHAR(100),
     campaign_start DATE,
     campaign_end DATE,
     go_live_date DATE,
-    priority ENUM('Low','Medium','High','Critical') DEFAULT 'Medium',
+    priority VARCHAR(20) DEFAULT 'Medium',
     campaign_owner VARCHAR(150),
     campaign_status VARCHAR(50) DEFAULT 'Planning',
-    approved_project_head VARCHAR(20) DEFAULT 'Pending',
-    approved_manager VARCHAR(20) DEFAULT 'Pending',
+    approved_project_head VARCHAR(30) DEFAULT 'Pending',
+    approved_manager VARCHAR(30) DEFAULT 'Pending',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,3 +60,10 @@ CREATE TABLE IF NOT EXISTS assets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (campaign_ref) REFERENCES campaigns(id) ON DELETE SET NULL
 );
+
+-- Run these if upgrading from an earlier version:
+-- ALTER TABLE campaigns MODIFY campaign_id VARCHAR(100);
+-- ALTER TABLE campaigns MODIFY approved_project_head VARCHAR(30) DEFAULT 'Pending';
+-- ALTER TABLE campaigns MODIFY approved_manager VARCHAR(30) DEFAULT 'Pending';
+-- ALTER TABLE campaigns ADD COLUMN descriptor VARCHAR(100) AFTER goal_code;
+-- ALTER TABLE assets MODIFY asset_id VARCHAR(100);

@@ -6,8 +6,8 @@ $db = getDB();
 $campaigns = $db->query("
     SELECT c.*,
         COUNT(a.id) total_assets,
-        SUM(a.status='Live') live_assets,
-        SUM(a.status='In Review') review_assets
+        SUM(a.status='Published / Live') live_assets,
+        SUM(a.status='In Revision') revision_assets
     FROM campaigns c
     LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0
     GROUP BY c.id ORDER BY c.created_at DESC
@@ -26,16 +26,16 @@ include 'includes/header.php';
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead class="table-light">
+            <table class="table table-hover mb-0">
+                <thead class="table-light sticky-top">
                     <tr>
                         <th class="hide-xs">Campaign ID</th><th>Campaign Name</th>
                         <th class="d-none d-md-table-cell">Vertical</th>
-                        <th class="d-none d-lg-table-cell">Campaign Type</th>
+                        <th class="d-none d-lg-table-cell">Type</th>
                         <th class="d-none d-lg-table-cell">Owner</th>
                         <th class="d-none d-md-table-cell">Go-Live</th>
                         <th>Priority</th><th>Status</th>
-                        <th class="d-none d-xl-table-cell">Ph Appr.</th>
+                        <th class="d-none d-xl-table-cell">PH Appr.</th>
                         <th class="d-none d-xl-table-cell">Mgr Appr.</th>
                         <th class="d-none d-sm-table-cell">Assets</th>
                         <th style="min-width:80px;">Actions</th>
@@ -48,26 +48,24 @@ include 'includes/header.php';
                     </td></tr>
                 <?php else: while ($c = $campaigns->fetch_assoc()): ?>
                     <tr>
-                        <td class="hide-xs"><code style="font-size:.75rem;"><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
+                        <td class="hide-xs"><code class="id-code"><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($c['campaign_name']) ?></div>
                             <small class="text-muted hide-xs"><?= htmlspecialchars($c['vertical'] ?? '') ?><?= $c['vertical'] && $c['campaign_type'] ? ' · ' : '' ?><?= htmlspecialchars($c['campaign_type'] ?? '') ?></small>
                         </td>
-                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($c['vertical'] ?? '-') ?></td>
-                        <td class="d-none d-lg-table-cell"><?= htmlspecialchars($c['campaign_type'] ?? '-') ?></td>
+                        <td class="d-none d-md-table-cell"><span class="vertical-chip"><?= htmlspecialchars($c['vertical'] ?? '-') ?></span></td>
+                        <td class="d-none d-lg-table-cell text-muted"><?= htmlspecialchars($c['campaign_type'] ?? '-') ?></td>
                         <td class="d-none d-lg-table-cell"><?= htmlspecialchars($c['campaign_owner'] ?? '-') ?></td>
-                        <td class="d-none d-md-table-cell"><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
+                        <td class="d-none d-md-table-cell text-muted"><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
                         <td><span class="badge-pill pri-<?= $c['priority'] ?>"><?= $c['priority'] ?></span></td>
-                        <td><span class="badge-pill cs-<?= str_replace(' ','-',$c['campaign_status']) ?>"><?= $c['campaign_status'] ?></span></td>
+                        <td><span class="badge-pill cs-<?= str_replace([' ','/'],'_',$c['campaign_status']) ?>"><?= $c['campaign_status'] ?></span></td>
                         <td class="d-none d-xl-table-cell">
-                            <span class="badge-pill <?= $c['approved_project_head']==='Yes'?'bg-success text-white':($c['approved_project_head']==='No'?'bg-danger text-white':'bg-secondary text-white') ?>">
-                                <?= $c['approved_project_head'] ?>
-                            </span>
+                            <?php $aph = $c['approved_project_head']; ?>
+                            <span class="badge-pill appr-<?= str_replace(' ','-',$aph) ?>"><?= $aph ?></span>
                         </td>
                         <td class="d-none d-xl-table-cell">
-                            <span class="badge-pill <?= $c['approved_manager']==='Yes'?'bg-success text-white':($c['approved_manager']==='No'?'bg-danger text-white':'bg-secondary text-white') ?>">
-                                <?= $c['approved_manager'] ?>
-                            </span>
+                            <?php $amg = $c['approved_manager']; ?>
+                            <span class="badge-pill appr-<?= str_replace(' ','-',$amg) ?>"><?= $amg ?></span>
                         </td>
                         <td class="d-none d-sm-table-cell">
                             <span class="text-success fw-semibold"><?= $c['live_assets'] ?></span>/<?= $c['total_assets'] ?>
@@ -101,34 +99,74 @@ include 'includes/header.php';
             <form id="campaignForm">
                 <div class="modal-body">
                     <input type="hidden" name="id" id="cId">
+
+                    <!-- ID Preview -->
+                    <div class="id-preview-bar mb-4" id="idPreviewBar">
+                        <span class="id-preview-label">Campaign ID Preview:</span>
+                        <code class="id-preview-value" id="idPreview">—</code>
+                        <small class="text-muted ms-2">(auto-generated on save)</small>
+                    </div>
+
                     <div class="row g-3">
+                        <!-- Row 1: Core identity -->
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Campaign Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="campaign_name" id="cName" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Vertical</label>
-                            <input type="text" class="form-control" name="vertical" id="cVertical" placeholder="e.g. DT, EV, HR">
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Vertical <span class="text-danger">*</span></label>
+                            <select class="form-select" name="vertical" id="cVertical" onchange="updateIdPreview()">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($VERTICALS as $code => $label): ?>
+                                    <option value="<?= $code ?>"><?= $code ?> — <?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Goal Code <span class="text-danger">*</span></label>
+                            <select class="form-select" name="goal_code" id="cGoalCode" onchange="updateIdPreview()">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($GOAL_CODES as $code => $label): ?>
+                                    <option value="<?= $code ?>"><?= $code ?> — <?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Descriptor
+                                <span class="text-muted fw-normal" style="font-size:.8rem;">(2–3 words, e.g. PLM-LAUNCH)</span>
+                            </label>
+                            <input type="text" class="form-control" name="descriptor" id="cDescriptor"
+                                placeholder="e.g. PLM-LAUNCH" oninput="updateIdPreview()" style="text-transform:uppercase;">
+                        </div>
+
+                        <!-- Row 2 -->
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Campaign Type</label>
-                            <input type="text" class="form-control" name="campaign_type" id="cType" placeholder="e.g. Lead Gen, Brand Awareness">
+                            <select class="form-select" name="campaign_type" id="cType">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($CAMPAIGN_TYPES as $t): ?>
+                                    <option value="<?= $t ?>"><?= $t ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Goal Code</label>
-                            <input type="text" class="form-control" name="goal_code" id="cGoalCode" placeholder="e.g. LG, BA, NU">
-                        </div>
-                        <div class="col-md-8">
                             <label class="form-label fw-semibold">Campaign Goal</label>
-                            <input type="text" class="form-control" name="campaign_goal" id="cGoal">
+                            <input type="text" class="form-control" name="campaign_goal" id="cGoal" placeholder="e.g. Lead Capture, Demo Request">
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Geography</label>
+                            <select class="form-select" name="geography" id="cGeo">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($GEOGRAPHIES as $g): ?>
+                                    <option value="<?= $g ?>"><?= $g ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Row 3 -->
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Target Audience</label>
                             <input type="text" class="form-control" name="target_audience" id="cAudience">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Geography</label>
-                            <input type="text" class="form-control" name="geography" id="cGeo" placeholder="e.g. India, Pan-India, Metro">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Campaign Start</label>
@@ -138,6 +176,8 @@ include 'includes/header.php';
                             <label class="form-label fw-semibold">Campaign End</label>
                             <input type="date" class="form-control" name="campaign_end" id="cEnd">
                         </div>
+
+                        <!-- Row 4 -->
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Go-Live Date</label>
                             <input type="date" class="form-control" name="go_live_date" id="cGoLive">
@@ -150,16 +190,16 @@ include 'includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Campaign Owner</label>
                             <select class="form-select" name="campaign_owner" id="cOwner">
                                 <option value="">-- Select User --</option>
                                 <?php $activeUsers->data_seek(0); while ($u = $activeUsers->fetch_assoc()): ?>
-                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?> <small>(<?= htmlspecialchars($u['role']) ?>)</small></option>
+                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role']) ?>)</option>
                                 <?php endwhile; ?>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Campaign Status</label>
                             <select class="form-select" name="campaign_status" id="cStatus">
                                 <?php foreach ($CAMPAIGN_STATUSES as $s): ?>
@@ -167,16 +207,18 @@ include 'includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-semibold">Approved by PH</label>
+
+                        <!-- Row 5: Approvals -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Approved by Project Head</label>
                             <select class="form-select" name="approved_project_head" id="cApprPH">
                                 <?php foreach ($APPROVAL_OPTS as $o): ?>
                                     <option value="<?= $o ?>"><?= $o ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-semibold">Approved by Mgr</label>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Approved by Manager</label>
                             <select class="form-select" name="approved_manager" id="cApprMgr">
                                 <?php foreach ($APPROVAL_OPTS as $o): ?>
                                     <option value="<?= $o ?>"><?= $o ?></option>
@@ -199,16 +241,30 @@ include 'includes/header.php';
 </div>
 
 <script>
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function updateIdPreview() {
+    const v = document.getElementById('cVertical').value;
+    const g = document.getElementById('cGoalCode').value;
+    const d = document.getElementById('cDescriptor').value.trim().toUpperCase().replace(/[^A-Z0-9\-]/g,'').replace(/\s+/g,'-');
+    const now = new Date();
+    const mon = MONTHS[now.getMonth()];
+    const yr  = String(now.getFullYear()).slice(-2);
+    const parts = [v||'??', g||'??', d||'DESCRIPTOR', mon+yr];
+    document.getElementById('idPreview').textContent = parts.join('-');
+}
+
 function editCampaign(c) {
     document.getElementById('campaignModalTitle').textContent = 'Edit Campaign';
     document.getElementById('cId').value          = c.id;
     document.getElementById('cName').value         = c.campaign_name;
     document.getElementById('cVertical').value     = c.vertical || '';
-    document.getElementById('cType').value         = c.campaign_type || '';
     document.getElementById('cGoalCode').value     = c.goal_code || '';
+    document.getElementById('cDescriptor').value   = c.descriptor || '';
+    document.getElementById('cType').value         = c.campaign_type || '';
     document.getElementById('cGoal').value         = c.campaign_goal || '';
-    document.getElementById('cAudience').value     = c.target_audience || '';
     document.getElementById('cGeo').value          = c.geography || '';
+    document.getElementById('cAudience').value     = c.target_audience || '';
     document.getElementById('cStart').value        = c.campaign_start || '';
     document.getElementById('cEnd').value          = c.campaign_end || '';
     document.getElementById('cGoLive').value       = c.go_live_date || '';
@@ -218,6 +274,8 @@ function editCampaign(c) {
     document.getElementById('cApprPH').value       = c.approved_project_head || 'Pending';
     document.getElementById('cApprMgr').value      = c.approved_manager || 'Pending';
     document.getElementById('cNotes').value        = c.notes || '';
+    // Show existing ID in preview bar
+    document.getElementById('idPreview').textContent = c.campaign_id || '—';
     new bootstrap.Modal(document.getElementById('campaignModal')).show();
 }
 
@@ -225,6 +283,7 @@ document.getElementById('campaignModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('campaignForm').reset();
     document.getElementById('cId').value = '';
     document.getElementById('campaignModalTitle').textContent = 'New Campaign';
+    document.getElementById('idPreview').textContent = '—';
 });
 
 document.getElementById('campaignForm').addEventListener('submit', function(e) {
