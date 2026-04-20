@@ -37,10 +37,10 @@ include 'includes/header.php';
         background: <?= $cfg['color'] ?>20; color: <?= $cfg['color'] ?>; }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div class="d-flex align-items-center gap-3">
-        <span class="type-badge"><i class="fa <?= $cfg['icon'] ?>"></i> <?= $cfg['label'] ?></span>
-        <form class="d-flex gap-2 flex-wrap mb-0" method="GET">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+    <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-2 w-100">
+        <span class="type-badge flex-shrink-0"><i class="fa <?= $cfg['icon'] ?>"></i> <?= $cfg['label'] ?></span>
+        <form class="d-flex filter-form gap-2 flex-wrap mb-0 w-100" method="GET">
             <input type="hidden" name="type" value="<?= $type ?>">
             <select name="campaign" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
                 <option value="">All Campaigns</option>
@@ -67,8 +67,8 @@ include 'includes/header.php';
             <?php endif; ?>
         </form>
     </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assetModal">
-        <i class="fa fa-plus me-1"></i> New <?= rtrim($cfg['label'],'s') ?>
+    <button class="btn btn-primary flex-shrink-0" data-bs-toggle="modal" data-bs-target="#assetModal">
+        <i class="fa fa-plus me-1"></i> <span class="d-none d-sm-inline">New <?= rtrim($cfg['label'],'s') ?></span><span class="d-sm-none">Add</span>
     </button>
 </div>
 
@@ -78,16 +78,15 @@ include 'includes/header.php';
             <table class="table table-hover mb-0" style="font-size:.83rem;">
                 <thead class="table-light">
                     <tr>
-                        <th>Asset ID</th><th>Asset Name</th><th>Campaign</th>
-                        <th>Vertical</th><th>Owner</th>
+                        <th class="hide-xs">Asset ID</th><th>Asset Name</th><th class="hide-xs">Campaign</th>
+                        <th class="d-none d-md-table-cell">Vertical</th><th class="d-none d-lg-table-cell">Owner</th>
                         <?php
-                        // Show up to 3 key extra fields in the table
                         $tableExtras = array_slice($cfg['extra'], 0, 3, true);
                         foreach ($tableExtras as $k => $label): ?>
-                            <th><?= $label ?></th>
+                            <th class="d-none d-xl-table-cell"><?= $label ?></th>
                         <?php endforeach; ?>
-                        <th>Due Date</th><th>Priority</th><th>Status</th>
-                        <th>PH</th><th>Mgr</th>
+                        <th class="d-none d-md-table-cell">Due Date</th><th>Priority</th><th>Status</th>
+                        <th class="d-none d-lg-table-cell">PH</th><th class="d-none d-lg-table-cell">Mgr</th>
                         <th style="min-width:80px;">Actions</th>
                     </tr>
                 </thead>
@@ -103,27 +102,27 @@ include 'includes/header.php';
                         && !in_array($a['status'],['Live','Approved','Cancelled','Archived']);
                 ?>
                     <tr <?= $overdue?'class="table-danger"':'' ?>>
-                        <td><code><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
+                        <td class="hide-xs"><code style="font-size:.75rem;"><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($a['asset_name']) ?></div>
                             <?php if ($a['feedback_notes']): ?>
-                                <small class="text-muted"><?= htmlspecialchars(substr($a['feedback_notes'],0,45)) ?>...</small>
+                                <small class="text-muted d-none d-sm-inline"><?= htmlspecialchars(substr($a['feedback_notes'],0,40)) ?>...</small>
                             <?php endif; ?>
                         </td>
-                        <td><small class="text-muted"><?= htmlspecialchars($a['c_campaign_id'] ?? ($a['campaign_id_text'] ?? '-')) ?></small></td>
-                        <td><?= htmlspecialchars($a['vertical'] ?? '-') ?></td>
-                        <td><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
+                        <td class="hide-xs"><small class="text-muted"><?= htmlspecialchars($a['c_campaign_id'] ?? ($a['campaign_id_text'] ?? '-')) ?></small></td>
+                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['vertical'] ?? '-') ?></td>
+                        <td class="d-none d-lg-table-cell"><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
                         <?php foreach (array_keys($tableExtras) as $k): ?>
-                            <td><small><?= htmlspecialchars($extra[$k] ?? '-') ?></small></td>
+                            <td class="d-none d-xl-table-cell"><small><?= htmlspecialchars($extra[$k] ?? '-') ?></small></td>
                         <?php endforeach; ?>
-                        <td>
+                        <td class="d-none d-md-table-cell">
                             <?= $a['due_date'] ? date('d M Y', strtotime($a['due_date'])) : '-' ?>
                             <?php if ($overdue): ?><br><small class="text-danger fw-bold">Overdue</small><?php endif; ?>
                         </td>
                         <td><span class="badge-pill pri-<?= $a['priority'] ?>"><?= $a['priority'] ?></span></td>
                         <td><span class="badge-pill st-<?= str_replace(' ','-',$a['status']) ?>"><?= $a['status'] ?></span></td>
-                        <td><small class="<?= $a['approved_project_head']==='Yes'?'text-success':($a['approved_project_head']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_project_head'] ?></small></td>
-                        <td><small class="<?= $a['approved_manager']==='Yes'?'text-success':($a['approved_manager']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_manager'] ?></small></td>
+                        <td class="d-none d-lg-table-cell"><small class="<?= $a['approved_project_head']==='Yes'?'text-success':($a['approved_project_head']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_project_head'] ?></small></td>
+                        <td class="d-none d-lg-table-cell"><small class="<?= $a['approved_manager']==='Yes'?'text-success':($a['approved_manager']==='No'?'text-danger':'text-muted') ?>"><?= $a['approved_manager'] ?></small></td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-1"
                                 onclick='editAsset(<?= htmlspecialchars(json_encode($a)) ?>)'>

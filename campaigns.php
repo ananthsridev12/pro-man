@@ -28,11 +28,16 @@ include 'includes/header.php';
             <table class="table table-hover mb-0" style="font-size:.85rem;">
                 <thead class="table-light">
                     <tr>
-                        <th>Campaign ID</th><th>Campaign Name</th><th>Vertical</th>
-                        <th>Campaign Type</th><th>Owner</th><th>Go-Live</th>
+                        <th class="hide-xs">Campaign ID</th><th>Campaign Name</th>
+                        <th class="d-none d-md-table-cell">Vertical</th>
+                        <th class="d-none d-lg-table-cell">Campaign Type</th>
+                        <th class="d-none d-lg-table-cell">Owner</th>
+                        <th class="d-none d-md-table-cell">Go-Live</th>
                         <th>Priority</th><th>Status</th>
-                        <th>Ph Appr.</th><th>Mgr Appr.</th>
-                        <th>Assets</th><th style="min-width:80px;">Actions</th>
+                        <th class="d-none d-xl-table-cell">Ph Appr.</th>
+                        <th class="d-none d-xl-table-cell">Mgr Appr.</th>
+                        <th class="d-none d-sm-table-cell">Assets</th>
+                        <th style="min-width:80px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,32 +47,29 @@ include 'includes/header.php';
                     </td></tr>
                 <?php else: while ($c = $campaigns->fetch_assoc()): ?>
                     <tr>
-                        <td><code><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
+                        <td class="hide-xs"><code style="font-size:.75rem;"><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($c['campaign_name']) ?></div>
-                            <?php if ($c['campaign_goal']): ?>
-                                <small class="text-muted"><?= htmlspecialchars(substr($c['campaign_goal'],0,50)) ?><?= strlen($c['campaign_goal'])>50?'...':'' ?></small>
-                            <?php endif; ?>
+                            <small class="text-muted hide-xs"><?= htmlspecialchars($c['vertical'] ?? '') ?><?= $c['vertical'] && $c['campaign_type'] ? ' · ' : '' ?><?= htmlspecialchars($c['campaign_type'] ?? '') ?></small>
                         </td>
-                        <td><?= htmlspecialchars($c['vertical'] ?? '-') ?></td>
-                        <td><?= htmlspecialchars($c['campaign_type'] ?? '-') ?></td>
-                        <td><?= htmlspecialchars($c['campaign_owner'] ?? '-') ?></td>
-                        <td><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
+                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($c['vertical'] ?? '-') ?></td>
+                        <td class="d-none d-lg-table-cell"><?= htmlspecialchars($c['campaign_type'] ?? '-') ?></td>
+                        <td class="d-none d-lg-table-cell"><?= htmlspecialchars($c['campaign_owner'] ?? '-') ?></td>
+                        <td class="d-none d-md-table-cell"><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
                         <td><span class="badge-pill pri-<?= $c['priority'] ?>"><?= $c['priority'] ?></span></td>
                         <td><span class="badge-pill cs-<?= str_replace(' ','-',$c['campaign_status']) ?>"><?= $c['campaign_status'] ?></span></td>
-                        <td>
+                        <td class="d-none d-xl-table-cell">
                             <span class="badge-pill <?= $c['approved_project_head']==='Yes'?'bg-success text-white':($c['approved_project_head']==='No'?'bg-danger text-white':'bg-secondary text-white') ?>">
                                 <?= $c['approved_project_head'] ?>
                             </span>
                         </td>
-                        <td>
+                        <td class="d-none d-xl-table-cell">
                             <span class="badge-pill <?= $c['approved_manager']==='Yes'?'bg-success text-white':($c['approved_manager']==='No'?'bg-danger text-white':'bg-secondary text-white') ?>">
                                 <?= $c['approved_manager'] ?>
                             </span>
                         </td>
-                        <td>
-                            <span class="text-success fw-semibold"><?= $c['live_assets'] ?></span> live /
-                            <span class="text-muted"><?= $c['total_assets'] ?></span> total
+                        <td class="d-none d-sm-table-cell">
+                            <span class="text-success fw-semibold"><?= $c['live_assets'] ?></span>/<?= $c['total_assets'] ?>
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary me-1"
