@@ -3,154 +3,179 @@ require_once 'config.php';
 $pageTitle = 'Dashboard';
 $db = getDB();
 
-$totalProjects = $db->query("SELECT COUNT(*) as c FROM projects")->fetch_assoc()['c'];
-$activeProjects = $db->query("SELECT COUNT(*) as c FROM projects WHERE status='active'")->fetch_assoc()['c'];
-$totalTasks = $db->query("SELECT COUNT(*) as c FROM tasks")->fetch_assoc()['c'];
-$completedTasks = $db->query("SELECT COUNT(*) as c FROM tasks WHERE status='completed'")->fetch_assoc()['c'];
-$inProgressTasks = $db->query("SELECT COUNT(*) as c FROM tasks WHERE status='in_progress'")->fetch_assoc()['c'];
-$overdueTasks = $db->query("SELECT COUNT(*) as c FROM tasks WHERE due_date < CURDATE() AND status NOT IN ('completed','cancelled')")->fetch_assoc()['c'];
+$totalCampaigns  = $db->query("SELECT COUNT(*) c FROM campaigns")->fetch_assoc()['c'];
+$activeCampaigns = $db->query("SELECT COUNT(*) c FROM campaigns WHERE campaign_status='Active'")->fetch_assoc()['c'];
+$totalAssets     = $db->query("SELECT COUNT(*) c FROM assets WHERE archived=0")->fetch_assoc()['c'];
+$liveAssets      = $db->query("SELECT COUNT(*) c FROM assets WHERE status='Live' AND archived=0")->fetch_assoc()['c'];
+$inReview        = $db->query("SELECT COUNT(*) c FROM assets WHERE status='In Review' AND archived=0")->fetch_assoc()['c'];
+$overdue         = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date < CURDATE() AND status NOT IN ('Live','Approved','Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
 
-$recentTasks = $db->query("
-    SELECT t.*, p.name as project_name
-    FROM tasks t
-    LEFT JOIN projects p ON t.project_id = p.id
-    ORDER BY t.created_at DESC LIMIT 10
+// Assets by type
+$byType = $db->query("SELECT asset_type, COUNT(*) c FROM assets WHERE archived=0 GROUP BY asset_type");
+
+// Recent assets
+$recentAssets = $db->query("
+    SELECT a.*, c.campaign_name
+    FROM assets a
+    LEFT JOIN campaigns c ON c.id = a.campaign_ref
+    WHERE a.archived=0
+    ORDER BY a.created_at DESC LIMIT 12
 ");
 
-$projectProgress = $db->query("
-    SELECT p.id, p.name, p.status,
-        COUNT(t.id) as total,
-        SUM(t.status='completed') as done
-    FROM projects p
-    LEFT JOIN tasks t ON t.project_id = p.id
-    GROUP BY p.id ORDER BY p.created_at DESC LIMIT 5
+// Campaign summary
+$campaigns = $db->query("
+    SELECT c.*,
+        COUNT(a.id) total_assets,
+        SUM(a.status='Live') live_assets
+    FROM campaigns c
+    LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0
+    GROUP BY c.id ORDER BY c.created_at DESC LIMIT 6
 ");
 
 include 'includes/header.php';
 ?>
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg,#2d9cdb,#1a7bbf);">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div style="font-size:2rem;font-weight:700;"><?= $totalProjects ?></div>
-                    <div style="opacity:.85;">Total Projects</div>
-                </div>
-                <i class="fa fa-folder-open fa-2x" style="opacity:.5;"></i>
-            </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid var(--accent);">
+            <div style="font-size:1.8rem;font-weight:700;color:var(--accent);"><?= $totalCampaigns ?></div>
+            <div class="text-muted small">Total Campaigns</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg,#27ae60,#1e8449);">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div style="font-size:2rem;font-weight:700;"><?= $completedTasks ?></div>
-                    <div style="opacity:.85;">Tasks Completed</div>
-                </div>
-                <i class="fa fa-circle-check fa-2x" style="opacity:.5;"></i>
-            </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid #27ae60;">
+            <div style="font-size:1.8rem;font-weight:700;color:#27ae60;"><?= $activeCampaigns ?></div>
+            <div class="text-muted small">Active Campaigns</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg,#f39c12,#d68910);">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div style="font-size:2rem;font-weight:700;"><?= $inProgressTasks ?></div>
-                    <div style="opacity:.85;">In Progress</div>
-                </div>
-                <i class="fa fa-spinner fa-2x" style="opacity:.5;"></i>
-            </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid #8e44ad;">
+            <div style="font-size:1.8rem;font-weight:700;color:#8e44ad;"><?= $totalAssets ?></div>
+            <div class="text-muted small">Total Assets</div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-card" style="background: linear-gradient(135deg,#e74c3c,#c0392b);">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div style="font-size:2rem;font-weight:700;"><?= $overdueTasks ?></div>
-                    <div style="opacity:.85;">Overdue Tasks</div>
-                </div>
-                <i class="fa fa-triangle-exclamation fa-2x" style="opacity:.5;"></i>
-            </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid #16a085;">
+            <div style="font-size:1.8rem;font-weight:700;color:#16a085;"><?= $liveAssets ?></div>
+            <div class="text-muted small">Live Assets</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid #f39c12;">
+            <div style="font-size:1.8rem;font-weight:700;color:#f39c12;"><?= $inReview ?></div>
+            <div class="text-muted small">In Review</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card h-100 text-center p-3" style="border-top:3px solid #e74c3c;">
+            <div style="font-size:1.8rem;font-weight:700;color:#e74c3c;"><?= $overdue ?></div>
+            <div class="text-muted small">Overdue</div>
         </div>
     </div>
 </div>
 
-<div class="row g-3">
-    <div class="col-lg-7">
-        <div class="card">
+<div class="row g-3 mb-4">
+    <!-- Assets by Tracker -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-semibold">Assets by Tracker</h6>
+            </div>
+            <div class="card-body">
+                <?php
+                $typeCount = [];
+                while ($r = $byType->fetch_assoc()) $typeCount[$r['asset_type']] = $r['c'];
+                foreach ($ASSET_TYPES as $type => $cfg):
+                    $cnt = $typeCount[$type] ?? 0;
+                    $pct = $totalAssets > 0 ? round(($cnt / $totalAssets) * 100) : 0;
+                ?>
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span style="font-size:.85rem;">
+                            <i class="fa <?= $cfg['icon'] ?> me-1" style="color:<?= $cfg['color'] ?>;width:16px;"></i>
+                            <?= $cfg['label'] ?>
+                        </span>
+                        <span class="text-muted" style="font-size:.82rem;"><?= $cnt ?></span>
+                    </div>
+                    <div class="progress" style="height:5px;">
+                        <div class="progress-bar" style="width:<?= $pct ?>%;background:<?= $cfg['color'] ?>;"></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Status -->
+    <div class="col-lg-8">
+        <div class="card h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                <h6 class="mb-0 fw-semibold">Recent Tasks</h6>
-                <a href="tasks.php" class="btn btn-sm btn-primary">View All</a>
+                <h6 class="mb-0 fw-semibold">Campaigns</h6>
+                <a href="campaigns.php" class="btn btn-sm btn-primary">View All</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0" style="font-size:.85rem;">
                         <thead class="table-light">
-                            <tr>
-                                <th>Task</th>
-                                <th>Project</th>
-                                <th>Assignee</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                            </tr>
+                            <tr><th>Campaign ID</th><th>Name</th><th>Owner</th><th>Status</th><th>Go-Live</th><th>Assets</th></tr>
                         </thead>
                         <tbody>
-                        <?php if ($recentTasks->num_rows === 0): ?>
-                            <tr><td colspan="5" class="text-center text-muted py-4">No tasks yet. <a href="upload.php">Import from Excel</a></td></tr>
-                        <?php else: ?>
-                            <?php while ($t = $recentTasks->fetch_assoc()): ?>
+                        <?php if ($campaigns->num_rows === 0): ?>
+                            <tr><td colspan="6" class="text-center text-muted py-4">No campaigns yet. <a href="campaigns.php">Add one</a> or <a href="upload.php">import from Excel</a>.</td></tr>
+                        <?php else: while ($c = $campaigns->fetch_assoc()): ?>
                             <tr>
-                                <td><?= htmlspecialchars($t['task_name']) ?></td>
-                                <td><small class="text-muted"><?= htmlspecialchars($t['project_name'] ?? '-') ?></small></td>
-                                <td><small><?= htmlspecialchars($t['assignee'] ?? '-') ?></small></td>
-                                <td><span class="badge-status status-<?= $t['status'] ?>"><?= ucwords(str_replace('_',' ',$t['status'])) ?></span></td>
-                                <td><span class="badge-status priority-<?= $t['priority'] ?>"><?= ucfirst($t['priority']) ?></span></td>
+                                <td><code><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
+                                <td class="fw-semibold"><?= htmlspecialchars($c['campaign_name']) ?></td>
+                                <td><?= htmlspecialchars($c['campaign_owner'] ?? '-') ?></td>
+                                <td><span class="badge-pill cs-<?= str_replace(' ','-',$c['campaign_status']) ?>"><?= $c['campaign_status'] ?></span></td>
+                                <td><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
+                                <td><?= $c['live_assets'] ?>/<?= $c['total_assets'] ?> live</td>
                             </tr>
-                            <?php endwhile; ?>
-                        <?php endif; ?>
+                        <?php endwhile; endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-5">
-        <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                <h6 class="mb-0 fw-semibold">Project Progress</h6>
-                <a href="projects.php" class="btn btn-sm btn-primary">View All</a>
-            </div>
-            <div class="card-body">
-                <?php if ($projectProgress->num_rows === 0): ?>
-                    <p class="text-muted text-center py-3">No projects yet. <a href="projects.php">Add one</a></p>
-                <?php else: ?>
-                    <?php while ($p = $projectProgress->fetch_assoc()):
-                        $pct = $p['total'] > 0 ? round(($p['done'] / $p['total']) * 100) : 0;
-                    ?>
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="fw-semibold" style="font-size:.9rem;"><?= htmlspecialchars($p['name']) ?></span>
-                            <span class="text-muted" style="font-size:.8rem;"><?= $p['done'] ?>/<?= $p['total'] ?> tasks &bull; <?= $pct ?>%</span>
-                        </div>
-                        <div class="progress" style="height:6px;">
-                            <div class="progress-bar bg-primary" style="width:<?= $pct ?>%"></div>
-                        </div>
-                    </div>
-                    <?php endwhile; ?>
-                <?php endif; ?>
-            </div>
-        </div>
+</div>
 
-        <div class="card mt-3">
-            <div class="card-body text-center py-4">
-                <i class="fa fa-file-excel fa-3x text-success mb-3"></i>
-                <h6 class="fw-semibold">Import from Excel</h6>
-                <p class="text-muted small">Upload your Excel file to import projects and tasks instantly.</p>
-                <a href="upload.php" class="btn btn-success">
-                    <i class="fa fa-upload me-1"></i> Upload Excel
-                </a>
-            </div>
+<!-- Recent Assets -->
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h6 class="mb-0 fw-semibold">Recent Assets</h6>
+        <a href="assets.php?type=creative" class="btn btn-sm btn-outline-secondary">Browse by Type</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size:.84rem;">
+                <thead class="table-light">
+                    <tr><th>Asset ID</th><th>Name</th><th>Type</th><th>Campaign</th><th>Owner</th><th>Due Date</th><th>Priority</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                <?php if ($recentAssets->num_rows === 0): ?>
+                    <tr><td colspan="8" class="text-center text-muted py-4">No assets yet. <a href="upload.php">Import from Excel</a>.</td></tr>
+                <?php else: while ($a = $recentAssets->fetch_assoc()):
+                    $cfg = $ASSET_TYPES[$a['asset_type']];
+                    $overdue = $a['due_date'] && strtotime($a['due_date']) < time() && !in_array($a['status'],['Live','Approved','Cancelled','Archived']);
+                ?>
+                    <tr <?= $overdue?'class="table-danger"':'' ?>>
+                        <td><code><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
+                        <td><?= htmlspecialchars($a['asset_name']) ?></td>
+                        <td>
+                            <span style="color:<?= $cfg['color'] ?>;font-size:.8rem;">
+                                <i class="fa <?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?>
+                            </span>
+                        </td>
+                        <td><small class="text-muted"><?= htmlspecialchars($a['campaign_name'] ?? '-') ?></small></td>
+                        <td><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
+                        <td><?= $a['due_date'] ? date('d M Y', strtotime($a['due_date'])) : '-' ?></td>
+                        <td><span class="badge-pill pri-<?= $a['priority'] ?>"><?= $a['priority'] ?></span></td>
+                        <td><span class="badge-pill st-<?= str_replace(' ','-',$a['status']) ?>"><?= $a['status'] ?></span></td>
+                    </tr>
+                <?php endwhile; endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

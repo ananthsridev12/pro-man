@@ -3,85 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $pageTitle ?? 'ProMan - Project Manager' ?></title>
+    <title><?= htmlspecialchars($pageTitle ?? 'SolidPro — Campaign Manager') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --sidebar-bg: #1e2a3a;
-            --sidebar-active: #2d9cdb;
-            --accent: #2d9cdb;
-        }
-        body { background: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
+        :root { --sidebar-w: 230px; --sidebar-bg: #0f1923; --accent: #2d9cdb; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
         .sidebar {
-            width: 240px; min-height: 100vh; background: var(--sidebar-bg);
-            position: fixed; top: 0; left: 0; z-index: 100;
+            width: var(--sidebar-w); min-height: 100vh; background: var(--sidebar-bg);
+            position: fixed; top: 0; left: 0; z-index: 100; overflow-y: auto;
         }
         .sidebar .brand {
-            padding: 20px 24px; font-size: 1.3rem; font-weight: 700;
-            color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 18px 20px 14px; font-size: 1.1rem; font-weight: 700;
+            color: #fff; border-bottom: 1px solid rgba(255,255,255,0.08);
+            letter-spacing: .5px;
         }
         .sidebar .brand span { color: var(--accent); }
+        .sidebar .nav-section {
+            padding: 10px 16px 4px; font-size: .68rem; font-weight: 600;
+            color: rgba(255,255,255,.3); text-transform: uppercase; letter-spacing: 1px;
+        }
         .sidebar nav a {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 24px; color: rgba(255,255,255,0.7);
-            text-decoration: none; font-size: 0.92rem; transition: all 0.2s;
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 20px; color: rgba(255,255,255,.65);
+            text-decoration: none; font-size: .85rem; transition: all .2s;
+            border-left: 3px solid transparent;
         }
-        .sidebar nav a:hover, .sidebar nav a.active {
-            background: rgba(45,156,219,0.15); color: #fff;
-            border-left: 3px solid var(--accent);
+        .sidebar nav a:hover { color: #fff; background: rgba(255,255,255,.05); }
+        .sidebar nav a.active {
+            color: #fff; background: rgba(45,156,219,.15);
+            border-left-color: var(--accent);
         }
-        .sidebar nav a i { width: 18px; }
-        .main-content { margin-left: 240px; padding: 24px; }
+        .sidebar nav a .dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .main-content { margin-left: var(--sidebar-w); padding: 20px 24px; min-height: 100vh; }
         .topbar {
-            background: #fff; border-radius: 10px; padding: 14px 24px;
-            margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            background: #fff; border-radius: 10px; padding: 12px 20px;
+            margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
             display: flex; align-items: center; justify-content: space-between;
         }
-        .topbar h4 { margin: 0; font-weight: 600; color: #1e2a3a; }
-        .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-radius: 10px; }
-        .stat-card { border-radius: 12px; padding: 20px; color: #fff; }
-        .badge-status { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; }
-        .priority-high { background: #fde8e8; color: #c0392b; }
-        .priority-medium { background: #fef3cd; color: #856404; }
-        .priority-low { background: #d1e7dd; color: #0f5132; }
-        .priority-critical { background: #f8d7da; color: #842029; }
-        .status-not_started { background: #e2e8f0; color: #475569; }
-        .status-in_progress { background: #dbeafe; color: #1d4ed8; }
-        .status-completed { background: #dcfce7; color: #15803d; }
-        .status-on_hold { background: #fef9c3; color: #854d0e; }
-        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .topbar h5 { margin: 0; font-weight: 600; color: #1a2533; }
+        .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.07); border-radius: 10px; }
+        .card-header { border-radius: 10px 10px 0 0 !important; }
         .btn-primary { background: var(--accent); border-color: var(--accent); }
-        .btn-primary:hover { background: #1a7bbf; border-color: #1a7bbf; }
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; min-height: auto; position: relative; }
-            .main-content { margin-left: 0; }
-        }
+        .btn-primary:hover { background: #1a85c2; border-color: #1a85c2; }
+        .badge-pill { font-size: .72rem; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+        .status-badge { display: inline-block; }
+        /* Priority colours */
+        .pri-Low      { background:#d1fae5;color:#065f46; }
+        .pri-Medium   { background:#fef3c7;color:#92400e; }
+        .pri-High     { background:#fee2e2;color:#991b1b; }
+        .pri-Critical { background:#fce7f3;color:#9d174d; }
+        /* Status colours */
+        .st-Not-Started   { background:#e2e8f0;color:#475569; }
+        .st-Briefed        { background:#e0f2fe;color:#0369a1; }
+        .st-In-Progress    { background:#dbeafe;color:#1d4ed8; }
+        .st-In-Review      { background:#fef9c3;color:#854d0e; }
+        .st-Approved       { background:#dcfce7;color:#166534; }
+        .st-Scheduled      { background:#ede9fe;color:#5b21b6; }
+        .st-Live           { background:#bbf7d0;color:#14532d; }
+        .st-Amends         { background:#ffedd5;color:#9a3412; }
+        .st-On-Hold        { background:#fef3c7;color:#92400e; }
+        .st-Cancelled      { background:#fee2e2;color:#991b1b; }
+        .st-Archived       { background:#f1f5f9;color:#64748b; }
+        /* Campaign status */
+        .cs-Planning    { background:#e0f2fe;color:#0369a1; }
+        .cs-Active      { background:#dcfce7;color:#166534; }
+        .cs-Paused      { background:#fef9c3;color:#854d0e; }
+        .cs-Completed   { background:#d1fae5;color:#065f46; }
+        .cs-Cancelled   { background:#fee2e2;color:#991b1b; }
+        .table>tbody>tr:hover { background: #f8fafc; }
     </style>
 </head>
 <body>
-<?php $currentPage = basename($_SERVER['PHP_SELF']); ?>
+<?php
+$currentPage = basename($_SERVER['PHP_SELF']);
+$currentType = $_GET['type'] ?? '';
+?>
 <div class="sidebar">
-    <div class="brand"><i class="fa fa-diagram-project"></i> Pro<span>Man</span></div>
+    <div class="brand"><i class="fa fa-diagram-project me-1"></i> Solid<span>Pro</span></div>
     <nav>
-        <a href="index.php" class="<?= $currentPage === 'index.php' ? 'active' : '' ?>">
-            <i class="fa fa-gauge"></i> Dashboard
+        <div class="nav-section">Main</div>
+        <a href="index.php" class="<?= $currentPage==='index.php'?'active':'' ?>">
+            <i class="fa fa-gauge fa-fw"></i> Dashboard
         </a>
-        <a href="projects.php" class="<?= $currentPage === 'projects.php' ? 'active' : '' ?>">
-            <i class="fa fa-folder-open"></i> Projects
+        <a href="campaigns.php" class="<?= $currentPage==='campaigns.php'?'active':'' ?>">
+            <i class="fa fa-folder-open fa-fw"></i> Campaign Master
         </a>
-        <a href="tasks.php" class="<?= $currentPage === 'tasks.php' ? 'active' : '' ?>">
-            <i class="fa fa-list-check"></i> Tasks
+
+        <div class="nav-section mt-2">Asset Trackers</div>
+        <?php foreach ($ASSET_TYPES as $type => $cfg): ?>
+        <a href="assets.php?type=<?= $type ?>"
+           class="<?= ($currentPage==='assets.php' && $currentType===$type)?'active':'' ?>">
+            <span class="dot" style="background:<?= $cfg['color'] ?>;"></span>
+            <?= $cfg['label'] ?>
         </a>
-        <a href="upload.php" class="<?= $currentPage === 'upload.php' ? 'active' : '' ?>">
-            <i class="fa fa-file-excel"></i> Import Excel
+        <?php endforeach; ?>
+
+        <div class="nav-section mt-2">Tools</div>
+        <a href="upload.php" class="<?= $currentPage==='upload.php'?'active':'' ?>">
+            <i class="fa fa-file-excel fa-fw"></i> Import Excel
         </a>
     </nav>
 </div>
 <div class="main-content">
     <div class="topbar">
-        <h4><?= $pageTitle ?? 'Dashboard' ?></h4>
-        <div class="text-muted" style="font-size:0.85rem;">
-            <i class="fa fa-calendar me-1"></i><?= date('d M Y') ?>
+        <h5><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h5>
+        <div class="text-muted" style="font-size:.82rem;">
+            <i class="fa fa-calendar-days me-1"></i><?= date('d M Y') ?>
         </div>
     </div>
