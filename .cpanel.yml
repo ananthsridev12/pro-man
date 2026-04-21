@@ -1,6 +1,6 @@
 ---
 deployment:
   tasks:
-    - /bin/cp /home1/de2shrnx/pro.easi7.in/config.php /tmp/proman_cfg.php || true
     - /bin/cp -rf . /home1/de2shrnx/pro.easi7.in/
-    - /bin/cp /tmp/proman_cfg.php /home1/de2shrnx/pro.easi7.in/config.php || true
+    - /bin/rm -f /home1/de2shrnx/pro.easi7.in/.cpanel.yml
+    - /bin/rm -f /home1/de2shrnx/pro.easi7.in/db.sql
