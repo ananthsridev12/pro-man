@@ -355,6 +355,9 @@ $currentType = $_GET['type'] ?? '';
         <a href="index.php" class="<?= $currentPage==='index.php'?'active':'' ?>" onclick="closeSidebar()">
             <span class="nav-icon"><i class="fa fa-gauge-high fa-fw"></i></span> Dashboard
         </a>
+        <a href="my-work.php" class="<?= $currentPage==='my-work.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-list-check fa-fw"></i></span> My Work
+        </a>
         <a href="campaigns.php" class="<?= $currentPage==='campaigns.php'?'active':'' ?>" onclick="closeSidebar()">
             <span class="nav-icon"><i class="fa fa-layer-group fa-fw"></i></span> Campaign Master
         </a>
