@@ -145,6 +145,7 @@
             background: var(--body-bg); border: 1px solid var(--border);
             border-radius: 8px; cursor: pointer; font-size: .82rem;
             font-weight: 500; color: var(--text-primary); transition: all .15s;
+            position: relative;
         }
         .topbar-user:hover { background: #e5e7eb; }
         .user-avatar-sm {
@@ -153,6 +154,21 @@
             display: flex; align-items: center; justify-content: center;
             font-size: .7rem; font-weight: 700; flex-shrink: 0;
         }
+        .user-dropdown {
+            display: none; position: absolute; top: calc(100% + 6px); right: 0;
+            background: #fff; border: 1px solid var(--border); border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 180px; z-index: 999;
+            overflow: hidden;
+        }
+        .user-dropdown.open { display: block; }
+        .user-dropdown a {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 14px; font-size: .83rem; color: var(--text-primary);
+            text-decoration: none; transition: background .12s;
+        }
+        .user-dropdown a:hover { background: #f3f4f6; }
+        .user-dropdown a.logout { color: #ef4444; }
+        .user-dropdown .dd-divider { border-top: 1px solid var(--border); margin: 4px 0; }
 
         /* ── Cards ── */
         .card { border: 1px solid var(--border); box-shadow: var(--card-shadow); border-radius: var(--card-radius); background: var(--card-bg); }
@@ -381,10 +397,25 @@ $currentType = $_GET['type'] ?? '';
                 <i class="fa fa-bell"></i>
                 <span class="bell-dot"></span>
             </div>
-            <div class="topbar-user">
-                <div class="user-avatar-sm">SP</div>
-                <span>SolidPro</span>
+            <div class="topbar-user" id="userMenuBtn">
+                <div class="user-avatar-sm"><?= strtoupper(substr($_SESSION['user_name'] ?? 'U', 0, 2)) ?></div>
+                <span><?= htmlspecialchars($_SESSION['user_name'] ?? 'User') ?></span>
+                <i class="fa fa-chevron-down" style="font-size:.65rem;color:var(--text-muted);"></i>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="profile.php"><i class="fa fa-user-circle"></i> My Profile</a>
+                    <div class="dd-divider"></div>
+                    <a href="logout.php" class="logout"><i class="fa fa-sign-out-alt"></i> Logout</a>
+                </div>
             </div>
         </div>
     </div>
+    <script>
+    document.getElementById('userMenuBtn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        document.getElementById('userDropdown').classList.toggle('open');
+    });
+    document.addEventListener('click', function() {
+        document.getElementById('userDropdown').classList.remove('open');
+    });
+    </script>
 
