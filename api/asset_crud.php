@@ -53,6 +53,9 @@ if (is_array($extraRaw)) {
 $extra_json = $db->real_escape_string(json_encode($extra));
 
 if ($id) {
+    // Fetch old values for activity log
+    $old = $db->query("SELECT status, approved_project_head, approved_manager, owner FROM assets WHERE id=$id")->fetch_assoc();
+
     $db->query("UPDATE assets SET
         asset_type='$asset_type_e', asset_name='$asset_name_e',
         campaign_ref=$campaign_ref, vertical='$vertical', owner='$owner', owner_id=$owner_id_sql,
@@ -63,6 +66,25 @@ if ($id) {
         revision_no=$revision_no, final_file_url='$final_url',
         feedback_notes='$feedback', extra_data='$extra_json'
         WHERE id=$id");
+
+    // Log changes
+    $uid = (int)$_SESSION['user_id'];
+    $changes = [
+        'status'               => [$old['status'], $status],
+        'approved_project_head'=> [$old['approved_project_head'], $appr_ph],
+        'approved_manager'     => [$old['approved_manager'], $appr_mgr],
+        'owner'                => [$old['owner'], $owner],
+    ];
+    foreach ($changes as $field => [$oldVal, $newVal]) {
+        if ($oldVal !== $newVal) {
+            $f  = $db->real_escape_string($field);
+            $ov = $db->real_escape_string($oldVal ?? '');
+            $nv = $db->real_escape_string($newVal ?? '');
+            $db->query("INSERT INTO activity_log (entity_type, entity_id, user_id, action, old_value, new_value)
+                VALUES ('asset', $id, $uid, '$f changed', '$ov', '$nv')");
+        }
+    }
+
     syncTask($db, $id, $asset_name, $owner_id, $due_date, $priority);
     echo json_encode(['success' => true]);
 } else {

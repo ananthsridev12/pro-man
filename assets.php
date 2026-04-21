@@ -128,6 +128,11 @@ include 'includes/header.php';
                         <td class="d-none d-lg-table-cell"><span class="badge-pill appr-<?= str_replace(' ','-',$aph) ?>"><?= $aph ?></span></td>
                         <td class="d-none d-lg-table-cell"><span class="badge-pill appr-<?= str_replace(' ','-',$amg) ?>"><?= $amg ?></span></td>
                         <td>
+                            <button class="btn btn-sm btn-outline-secondary me-1"
+                                onclick="openActivity(<?= $a['id'] ?>, '<?= htmlspecialchars(addslashes($a['asset_name'])) ?>')"
+                                title="Comments & Activity">
+                                <i class="fa fa-comments"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-primary me-1"
                                 onclick='editAsset(<?= htmlspecialchars(json_encode($a)) ?>)'>
                                 <i class="fa fa-pen"></i>
@@ -365,6 +370,103 @@ function deleteAsset(id, name) {
     fetch('api/asset_crud.php', { method: 'POST', body: fd })
         .then(r => r.json()).then(res => { if (res.success) location.reload(); else alert(res.message); });
 }
+
+let activeAssetId = null;
+const actPanel = new bootstrap.Offcanvas(document.getElementById('activityPanel'));
+
+function openActivity(id, name) {
+    activeAssetId = id;
+    document.getElementById('actPanelTitle').textContent = name;
+    document.getElementById('commentsList').innerHTML = '<p class="text-muted text-center py-3">Loading…</p>';
+    document.getElementById('activityList').innerHTML = '';
+    actPanel.show();
+    loadActivity(id);
+}
+
+function loadActivity(id) {
+    fetch('api/comment_crud.php?action=fetch&id=' + id)
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) return;
+            const d = res.data;
+            // Comments
+            const cl = document.getElementById('commentsList');
+            if (d.comments.length === 0) {
+                cl.innerHTML = '<p class="text-muted text-center py-2" style="font-size:.8rem;">No comments yet.</p>';
+            } else {
+                cl.innerHTML = d.comments.map(c => `
+                    <div class="comment-item mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong style="font-size:.8rem;">${escHtml(c.user_name||'Unknown')}</strong>
+                            <span style="font-size:.72rem;color:#9ca3af;">${c.created_at.slice(0,16)}</span>
+                        </div>
+                        <div style="font-size:.83rem;">${escHtml(c.comment_text)}</div>
+                    </div>`).join('');
+            }
+            // Activity
+            const al = document.getElementById('activityList');
+            al.innerHTML = d.activity.length === 0
+                ? '<p class="text-muted text-center py-2" style="font-size:.8rem;">No activity yet.</p>'
+                : d.activity.map(a => `
+                    <div class="activity-item mb-1">
+                        <span style="font-size:.75rem;color:#6b7280;">${a.created_at.slice(0,16)}</span>
+                        <span style="font-size:.78rem;"> — <strong>${escHtml(a.user_name||'System')}</strong>:
+                        ${escHtml(a.action)}
+                        ${a.old_value ? `<span class="text-danger">${escHtml(a.old_value)}</span> → ` : ''}
+                        <span class="text-success">${escHtml(a.new_value||'')}</span></span>
+                    </div>`).join('');
+        });
+}
+
+function submitComment() {
+    const txt = document.getElementById('commentInput').value.trim();
+    if (!txt || !activeAssetId) return;
+    const fd = new FormData();
+    fd.append('action','add'); fd.append('entity_id', activeAssetId); fd.append('comment_text', txt);
+    fetch('api/comment_crud.php', { method:'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                document.getElementById('commentInput').value = '';
+                loadActivity(activeAssetId);
+            }
+        });
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 </script>
+
+<!-- Activity & Comments Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="activityPanel" style="width:380px;max-width:100%;">
+    <div class="offcanvas-header" style="border-bottom:1px solid var(--border);">
+        <h6 class="offcanvas-title fw-semibold" id="actPanelTitle">Activity</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0 d-flex flex-column">
+        <!-- Comments -->
+        <div class="p-3" style="flex:1;overflow-y:auto;">
+            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Comments</p>
+            <div id="commentsList"></div>
+            <div class="mt-2 d-flex gap-2">
+                <textarea id="commentInput" class="form-control form-control-sm" rows="2" placeholder="Add a comment…" style="resize:none;"></textarea>
+                <button class="btn btn-primary btn-sm px-3" onclick="submitComment()">
+                    <i class="fa fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Activity Log -->
+        <div class="p-3" style="border-top:1px solid var(--border);max-height:280px;overflow-y:auto;">
+            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Activity Log</p>
+            <div id="activityList"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.comment-item { background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:8px 10px; }
+.activity-item { padding:4px 0;border-bottom:1px solid #f3f4f6; }
+</style>
 
 <?php include 'includes/footer.php'; $db->close(); ?>
