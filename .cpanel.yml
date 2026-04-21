@@ -1,12 +1,6 @@
 ---
 deployment:
   tasks:
-    - test -f /home1/de2shrnx/pro.easi7.in/config.php && /bin/cp /home1/de2shrnx/pro.easi7.in/config.php /tmp/proman_cfg.php || true
-    - /bin/cp -R . /home1/de2shrnx/pro.easi7.in/
-    - test -f /tmp/proman_cfg.php && /bin/cp /tmp/proman_cfg.php /home1/de2shrnx/pro.easi7.in/config.php && /bin/rm -f /tmp/proman_cfg.php || true
-    - /bin/rm -f /home1/de2shrnx/pro.easi7.in/.cpanel.yml
-    - /bin/rm -f /home1/de2shrnx/pro.easi7.in/db.sql
-    - /bin/find /home1/de2shrnx/pro.easi7.in -maxdepth 1 -name "*.php" -exec /bin/chmod 644 {} \; || true
-    - /bin/find /home1/de2shrnx/pro.easi7.in/api -name "*.php" -exec /bin/chmod 644 {} \; || true
-    - /bin/find /home1/de2shrnx/pro.easi7.in/includes -name "*.php" -exec /bin/chmod 644 {} \; || true
-    - /bin/chmod 755 /home1/de2shrnx/pro.easi7.in /home1/de2shrnx/pro.easi7.in/api /home1/de2shrnx/pro.easi7.in/includes || true
+    - /bin/cp /home1/de2shrnx/pro.easi7.in/config.php /tmp/proman_cfg.php || true
+    - /bin/cp -rf . /home1/de2shrnx/pro.easi7.in/
+    - /bin/cp /tmp/proman_cfg.php /home1/de2shrnx/pro.easi7.in/config.php || true
