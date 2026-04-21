@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/auth.php';
 $pageTitle = 'Users & Roles';
 $db = getDB();
 

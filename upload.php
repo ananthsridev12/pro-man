@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/auth.php';
 $pageTitle = 'Import Excel';
 $db = getDB();
 $campaigns = $db->query("SELECT id, campaign_id, campaign_name FROM campaigns ORDER BY campaign_id");

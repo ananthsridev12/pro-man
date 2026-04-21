@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 header('Content-Type: application/json');
+if (empty($_SESSION['user_id'])) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 $db = getDB();
 
 $action = $_POST['action'] ?? 'save';

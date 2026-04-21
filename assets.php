@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/auth.php';
 
 $type = $_GET['type'] ?? 'creative';
 if (!array_key_exists($type, $ASSET_TYPES)) {
