@@ -1,5 +1,7 @@
 <?php
+ob_start();
 require_once '../config.php';
+ob_clean();
 header('Content-Type: application/json');
 $db = getDB();
 
