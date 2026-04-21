@@ -372,6 +372,9 @@ $currentType = $_GET['type'] ?? '';
 
         <div class="sidebar-divider"></div>
         <div class="sidebar-section">Settings</div>
+        <a href="projects.php" class="<?= $currentPage==='projects.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-diagram-project fa-fw"></i></span> Projects
+        </a>
         <a href="users.php" class="<?= $currentPage==='users.php'?'active':'' ?>" onclick="closeSidebar()">
             <span class="nav-icon"><i class="fa fa-users fa-fw"></i></span> Users &amp; Roles
         </a>
