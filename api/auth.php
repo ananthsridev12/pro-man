@@ -12,7 +12,12 @@ if (!$email || !$password) {
 }
 
 $e   = $db->real_escape_string($email);
-$row = $db->query("SELECT id, name, email, role, department, status, password_hash FROM users WHERE email='$e' LIMIT 1")->fetch_assoc();
+$res = $db->query("SELECT id, name, email, role, department, status, password_hash FROM users WHERE email='$e' LIMIT 1");
+if (!$res) {
+    echo json_encode(['success' => false, 'message' => 'DB error: ' . $db->error]);
+    $db->close(); exit;
+}
+$row = $res->fetch_assoc();
 
 if (!$row) {
     echo json_encode(['success' => false, 'message' => 'Invalid email or password.']);
