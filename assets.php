@@ -10,6 +10,9 @@ if (!array_key_exists($type, $ASSET_TYPES)) {
 $cfg       = $ASSET_TYPES[$type];
 $pageTitle = $cfg['label'];
 $db        = getDB();
+$uid       = (int)$_SESSION['user_id'];
+$role      = $_SESSION['user_role'] ?? '';
+$isAdmin   = in_array($role, ['Admin','Project Head']);
 
 // Filters
 $filterCampaign = isset($_GET['campaign']) ? (int)$_GET['campaign'] : 0;
@@ -17,14 +20,23 @@ $filterStatus   = $_GET['status'] ?? '';
 $filterPriority = $_GET['priority'] ?? '';
 
 $where = "a.asset_type='" . $db->real_escape_string($type) . "' AND a.archived=0";
+
+// Role-based visibility
+if (!$isAdmin) {
+    $where .= " AND (a.owner_id=$uid OR a.created_by=$uid OR a.support_id=$uid)";
+}
+
 if ($filterCampaign) $where .= " AND a.campaign_ref=$filterCampaign";
 if ($filterStatus)   $where .= " AND a.status='" . $db->real_escape_string($filterStatus) . "'";
 if ($filterPriority) $where .= " AND a.priority='" . $db->real_escape_string($filterPriority) . "'";
 
 $assets = $db->query("
-    SELECT a.*, c.campaign_name, c.campaign_id as c_campaign_id
+    SELECT a.*, c.campaign_name, c.campaign_id as c_campaign_id,
+           u.name AS owner_name, s.name AS support_name
     FROM assets a
     LEFT JOIN campaigns c ON c.id = a.campaign_ref
+    LEFT JOIN users u ON u.id = a.owner_id
+    LEFT JOIN users s ON s.id = a.support_id
     WHERE $where ORDER BY a.due_date ASC, a.priority DESC, a.created_at DESC
 ");
 
@@ -82,23 +94,20 @@ include 'includes/header.php';
             <table class="table table-hover mb-0">
                 <thead class="table-light sticky-top">
                     <tr>
-                        <th class="hide-xs">Asset ID</th><th>Asset Name</th><th class="hide-xs">Campaign</th>
-                        <th class="d-none d-md-table-cell">Owner</th>
-                        <?php
-                        $tableExtras = array_slice($cfg['extra'], 0, 2, true);
-                        foreach ($tableExtras as $k => $fld): ?>
-                            <th class="d-none d-xl-table-cell"><?= is_array($fld) ? $fld['label'] : $fld ?></th>
-                        <?php endforeach; ?>
-                        <th class="d-none d-md-table-cell">Due Date</th><th>Priority</th><th>Status</th>
-                        <th class="d-none d-lg-table-cell">PH</th><th class="d-none d-lg-table-cell">Mgr</th>
-                        <th style="min-width:80px;">Actions</th>
+                        <th class="hide-xs">ID</th><th>Name</th><th class="hide-xs">Campaign</th>
+                        <th class="d-none d-md-table-cell">Assigned To</th>
+                        <th class="d-none d-md-table-cell">Support</th>
+                        <th class="d-none d-md-table-cell">Due Date</th>
+                        <th>Priority</th><th>Status</th>
+                        <th class="d-none d-lg-table-cell">PH</th>
+                        <th class="d-none d-lg-table-cell">Mgr</th>
+                        <th style="min-width:100px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ($assets->num_rows === 0): ?>
                     <tr><td colspan="20" class="text-center text-muted py-5">
-                        No <?= strtolower($cfg['label']) ?> yet.
-                        <a href="upload.php">Import from Excel</a> or add manually.
+                        No <?= strtolower($cfg['label']) ?> yet. Click "New <?= rtrim($cfg['label'],'s') ?>" to add one.
                     </td></tr>
                 <?php else: while ($a = $assets->fetch_assoc()):
                     $extra = json_decode($a['extra_data'] ?? '{}', true) ?: [];
@@ -110,14 +119,12 @@ include 'includes/header.php';
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($a['asset_name']) ?></div>
                             <?php if ($a['feedback_notes']): ?>
-                                <small class="text-muted d-none d-sm-inline"><?= htmlspecialchars(substr($a['feedback_notes'],0,40)) ?>…</small>
+                                <small class="text-muted"><?= htmlspecialchars(substr($a['feedback_notes'],0,40)) ?>…</small>
                             <?php endif; ?>
                         </td>
-                        <td class="hide-xs"><small class="text-muted"><?= htmlspecialchars($a['c_campaign_id'] ?? ($a['campaign_id_text'] ?? '-')) ?></small></td>
-                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
-                        <?php foreach (array_keys($tableExtras) as $k): ?>
-                            <td class="d-none d-xl-table-cell"><small><?= htmlspecialchars($extra[$k] ?? '-') ?></small></td>
-                        <?php endforeach; ?>
+                        <td class="hide-xs"><small class="text-muted"><?= htmlspecialchars($a['c_campaign_id'] ?? '-') ?></small></td>
+                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['owner_name'] ?? $a['owner'] ?? '-') ?></td>
+                        <td class="d-none d-md-table-cell"><?= htmlspecialchars($a['support_name'] ?? $a['support'] ?? '-') ?></td>
                         <td class="d-none d-md-table-cell">
                             <?= $a['due_date'] ? date('d M Y', strtotime($a['due_date'])) : '-' ?>
                             <?php if ($overdue): ?><br><small class="text-danger fw-bold">Overdue</small><?php endif; ?>
@@ -137,10 +144,12 @@ include 'includes/header.php';
                                 onclick='editAsset(<?= htmlspecialchars(json_encode($a)) ?>)'>
                                 <i class="fa fa-pen"></i>
                             </button>
+                            <?php if ($isAdmin || (int)$a['created_by'] === $uid): ?>
                             <button class="btn btn-sm btn-outline-danger"
                                 onclick="deleteAsset(<?= $a['id'] ?>, '<?= htmlspecialchars(addslashes($a['asset_name'])) ?>')">
                                 <i class="fa fa-trash"></i>
                             </button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endwhile; endif; ?>
@@ -164,14 +173,13 @@ include 'includes/header.php';
                 <input type="hidden" name="asset_type" value="<?= $type ?>">
                 <input type="hidden" name="id" id="aId">
                 <div class="modal-body">
-                    <!-- Common Fields -->
-                    <p class="modal-section-title">Common Fields</p>
+                    <p class="modal-section-title">Basic Details</p>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Asset Name <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Requirement Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="asset_name" id="aName" required>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Campaign</label>
                             <select class="form-select" name="campaign_ref" id="aCampaign">
                                 <option value="">-- None --</option>
@@ -180,48 +188,43 @@ include 'includes/header.php';
                                 <?php endwhile; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Vertical</label>
-                            <input type="text" class="form-control" name="vertical" id="aVertical" placeholder="Auto from campaign">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Owner</label>
-                            <select class="form-select" name="owner" id="aOwner">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Assign To (Primary) <span class="text-danger">*</span></label>
+                            <select class="form-select" name="owner_id" id="aOwnerId" required>
                                 <option value="">-- Select --</option>
                                 <?php foreach ($userOpts as $u): ?>
-                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                    <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> <small>(<?= $u['role'] ?>)</small></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Support</label>
-                            <select class="form-select" name="support" id="aSupport">
-                                <option value="">-- Select --</option>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Support (Secondary)</label>
+                            <select class="form-select" name="support_id" id="aSupportId">
+                                <option value="">-- None --</option>
                                 <?php foreach ($userOpts as $u): ?>
-                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
+                                    <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">Requested By</label>
-                            <select class="form-select" name="requested_by" id="aReqBy">
-                                <option value="">-- Select --</option>
-                                <?php foreach ($userOpts as $u): ?>
-                                    <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <input type="text" class="form-control" name="requested_by" id="aReqBy" placeholder="Requester name">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Brief Date</label>
                             <input type="date" class="form-control" name="brief_date" id="aBriefDate">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Due Date <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Due Date</label>
                             <input type="date" class="form-control" name="due_date" id="aDueDate">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Publish / Go-Live Date</label>
                             <input type="date" class="form-control" name="pub_date" id="aPubDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Vertical</label>
+                            <input type="text" class="form-control" name="vertical" id="aVertical" placeholder="Auto from campaign">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Priority</label>
@@ -259,7 +262,7 @@ include 'includes/header.php';
                             <label class="form-label fw-semibold">Revision #</label>
                             <input type="number" class="form-control" name="revision_no" id="aRevNo" min="0" value="0">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-10">
                             <label class="form-label fw-semibold">Final File / URL</label>
                             <input type="text" class="form-control" name="final_file_url" id="aFinalUrl">
                         </div>
@@ -269,7 +272,7 @@ include 'includes/header.php';
                         </div>
                     </div>
 
-                    <!-- Type-Specific Fields -->
+                    <?php if (!empty($cfg['extra'])): ?>
                     <p class="modal-section-title" style="color:<?= $cfg['color'] ?>;">
                         <i class="fa <?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?> Details
                     </p>
@@ -310,37 +313,67 @@ include 'includes/header.php';
                         </div>
                     <?php endforeach; ?>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary" id="assetSaveBtn">Save Requirement</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Activity & Comments Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="activityPanel" style="width:380px;max-width:100%;">
+    <div class="offcanvas-header" style="border-bottom:1px solid var(--border);">
+        <h6 class="offcanvas-title fw-semibold" id="actPanelTitle">Activity</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0 d-flex flex-column">
+        <div class="p-3" style="flex:1;overflow-y:auto;">
+            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Comments</p>
+            <div id="commentsList"></div>
+            <div class="mt-2 d-flex gap-2">
+                <textarea id="commentInput" class="form-control form-control-sm" rows="2" placeholder="Add a comment…" style="resize:none;"></textarea>
+                <button class="btn btn-primary btn-sm px-3" onclick="submitComment()">
+                    <i class="fa fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-3" style="border-top:1px solid var(--border);max-height:280px;overflow-y:auto;">
+            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Activity Log</p>
+            <div id="activityList"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.comment-item { background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:8px 10px; }
+.activity-item { padding:4px 0;border-bottom:1px solid #f3f4f6; }
+</style>
+
 <script>
 function editAsset(a) {
     document.getElementById('assetModalTitle').innerHTML =
-        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>Edit Asset';
-    document.getElementById('aId').value           = a.id;
-    document.getElementById('aName').value          = a.asset_name;
-    document.getElementById('aCampaign').value      = a.campaign_ref || '';
-    document.getElementById('aVertical').value      = a.vertical || '';
-    document.getElementById('aOwner').value         = a.owner || '';
-    document.getElementById('aSupport').value       = a.support || '';
-    document.getElementById('aReqBy').value         = a.requested_by || '';
-    document.getElementById('aBriefDate').value     = a.brief_date || '';
-    document.getElementById('aDueDate').value       = a.due_date || '';
-    document.getElementById('aPubDate').value       = a.pub_date || '';
-    document.getElementById('aPriority').value      = a.priority || 'Medium';
-    document.getElementById('aStatus').value        = a.status || 'Briefed';
-    document.getElementById('aApprPH').value        = a.approved_project_head || 'Pending';
-    document.getElementById('aApprMgr').value       = a.approved_manager || 'Pending';
-    document.getElementById('aRevNo').value         = a.revision_no || 0;
-    document.getElementById('aFinalUrl').value      = a.final_file_url || '';
-    document.getElementById('aFeedback').value      = a.feedback_notes || '';
+        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>Edit Requirement';
+    document.getElementById('aId').value        = a.id;
+    document.getElementById('aName').value       = a.asset_name;
+    document.getElementById('aCampaign').value   = a.campaign_ref || '';
+    document.getElementById('aOwnerId').value    = a.owner_id || '';
+    document.getElementById('aSupportId').value  = a.support_id || '';
+    document.getElementById('aReqBy').value      = a.requested_by || '';
+    document.getElementById('aVertical').value   = a.vertical || '';
+    document.getElementById('aBriefDate').value  = a.brief_date || '';
+    document.getElementById('aDueDate').value    = a.due_date || '';
+    document.getElementById('aPubDate').value    = a.pub_date || '';
+    document.getElementById('aPriority').value   = a.priority || 'Medium';
+    document.getElementById('aStatus').value     = a.status || 'Briefed';
+    document.getElementById('aApprPH').value     = a.approved_project_head || 'Pending';
+    document.getElementById('aApprMgr').value    = a.approved_manager || 'Pending';
+    document.getElementById('aRevNo').value      = a.revision_no || 0;
+    document.getElementById('aFinalUrl').value   = a.final_file_url || '';
+    document.getElementById('aFeedback').value   = a.feedback_notes || '';
     const extra = typeof a.extra_data === 'string' ? JSON.parse(a.extra_data || '{}') : (a.extra_data || {});
     for (const [k, v] of Object.entries(extra)) {
         const el = document.getElementById('extra_' + k);
@@ -353,22 +386,29 @@ document.getElementById('assetModal').addEventListener('hidden.bs.modal', functi
     document.getElementById('assetForm').reset();
     document.getElementById('aId').value = '';
     document.getElementById('assetModalTitle').innerHTML =
-        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>New Asset';
+        '<i class="fa <?= $cfg['icon'] ?> me-2"></i>New <?= rtrim($cfg['label'],'s') ?>';
 });
 
 document.getElementById('assetForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    const btn = document.getElementById('assetSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
     fetch('api/asset_crud.php', { method: 'POST', body: new FormData(this) })
         .then(r => r.json())
-        .then(res => { if (res.success) location.reload(); else alert(res.message || 'Error'); });
+        .then(res => {
+            if (res.success) location.reload();
+            else alert(res.message || 'Error saving requirement.');
+        })
+        .catch(() => alert('Network error.'))
+        .finally(() => { btn.disabled = false; btn.textContent = 'Save Requirement'; });
 });
 
 function deleteAsset(id, name) {
     if (!confirm('Delete "' + name + '"?')) return;
     const fd = new FormData();
-    fd.append('action', 'delete'); fd.append('id', id);
-    fetch('api/asset_crud.php', { method: 'POST', body: fd })
-        .then(r => r.json()).then(res => { if (res.success) location.reload(); else alert(res.message); });
+    fd.append('action','delete'); fd.append('id',id);
+    fetch('api/asset_crud.php', {method:'POST',body:fd})
+        .then(r=>r.json()).then(res=>{ if(res.success) location.reload(); else alert(res.message); });
 }
 
 let activeAssetId = null;
@@ -389,32 +429,27 @@ function loadActivity(id) {
         .then(res => {
             if (!res.success) return;
             const d = res.data;
-            // Comments
             const cl = document.getElementById('commentsList');
-            if (d.comments.length === 0) {
-                cl.innerHTML = '<p class="text-muted text-center py-2" style="font-size:.8rem;">No comments yet.</p>';
-            } else {
-                cl.innerHTML = d.comments.map(c => `
-                    <div class="comment-item mb-2">
-                        <div class="d-flex justify-content-between">
-                            <strong style="font-size:.8rem;">${escHtml(c.user_name||'Unknown')}</strong>
-                            <span style="font-size:.72rem;color:#9ca3af;">${c.created_at.slice(0,16)}</span>
-                        </div>
-                        <div style="font-size:.83rem;">${escHtml(c.comment_text)}</div>
-                    </div>`).join('');
-            }
-            // Activity
+            cl.innerHTML = d.comments.length === 0
+                ? '<p class="text-muted text-center py-2" style="font-size:.8rem;">No comments yet.</p>'
+                : d.comments.map(c => `<div class="comment-item mb-2">
+                    <div class="d-flex justify-content-between">
+                        <strong style="font-size:.8rem;">${escHtml(c.user_name||'?')}</strong>
+                        <span style="font-size:.72rem;color:#9ca3af;">${c.created_at.slice(0,16)}</span>
+                    </div>
+                    <div style="font-size:.83rem;">${escHtml(c.comment_text)}</div>
+                  </div>`).join('');
+
             const al = document.getElementById('activityList');
             al.innerHTML = d.activity.length === 0
                 ? '<p class="text-muted text-center py-2" style="font-size:.8rem;">No activity yet.</p>'
-                : d.activity.map(a => `
-                    <div class="activity-item mb-1">
-                        <span style="font-size:.75rem;color:#6b7280;">${a.created_at.slice(0,16)}</span>
-                        <span style="font-size:.78rem;"> — <strong>${escHtml(a.user_name||'System')}</strong>:
-                        ${escHtml(a.action)}
-                        ${a.old_value ? `<span class="text-danger">${escHtml(a.old_value)}</span> → ` : ''}
-                        <span class="text-success">${escHtml(a.new_value||'')}</span></span>
-                    </div>`).join('');
+                : d.activity.map(a => `<div class="activity-item mb-1">
+                    <span style="font-size:.75rem;color:#6b7280;">${a.created_at.slice(0,16)}</span>
+                    <span style="font-size:.78rem;"> — <strong>${escHtml(a.user_name||'System')}</strong>:
+                    ${escHtml(a.action)}
+                    ${a.old_value ? `<span class="text-danger">${escHtml(a.old_value)}</span> → ` : ''}
+                    <span class="text-success">${escHtml(a.new_value||'')}</span></span>
+                  </div>`).join('');
         });
 }
 
@@ -422,51 +457,15 @@ function submitComment() {
     const txt = document.getElementById('commentInput').value.trim();
     if (!txt || !activeAssetId) return;
     const fd = new FormData();
-    fd.append('action','add'); fd.append('entity_id', activeAssetId); fd.append('comment_text', txt);
-    fetch('api/comment_crud.php', { method:'POST', body: fd })
-        .then(r => r.json())
-        .then(res => {
-            if (res.success) {
-                document.getElementById('commentInput').value = '';
-                loadActivity(activeAssetId);
-            }
-        });
+    fd.append('action','add'); fd.append('entity_id',activeAssetId); fd.append('comment_text',txt);
+    fetch('api/comment_crud.php',{method:'POST',body:fd})
+        .then(r=>r.json())
+        .then(res=>{ if(res.success){ document.getElementById('commentInput').value=''; loadActivity(activeAssetId); }});
 }
 
 function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
-
-<!-- Activity & Comments Offcanvas -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="activityPanel" style="width:380px;max-width:100%;">
-    <div class="offcanvas-header" style="border-bottom:1px solid var(--border);">
-        <h6 class="offcanvas-title fw-semibold" id="actPanelTitle">Activity</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-    </div>
-    <div class="offcanvas-body p-0 d-flex flex-column">
-        <!-- Comments -->
-        <div class="p-3" style="flex:1;overflow-y:auto;">
-            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Comments</p>
-            <div id="commentsList"></div>
-            <div class="mt-2 d-flex gap-2">
-                <textarea id="commentInput" class="form-control form-control-sm" rows="2" placeholder="Add a comment…" style="resize:none;"></textarea>
-                <button class="btn btn-primary btn-sm px-3" onclick="submitComment()">
-                    <i class="fa fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-        <!-- Activity Log -->
-        <div class="p-3" style="border-top:1px solid var(--border);max-height:280px;overflow-y:auto;">
-            <p class="fw-semibold mb-2" style="font-size:.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Activity Log</p>
-            <div id="activityList"></div>
-        </div>
-    </div>
-</div>
-
-<style>
-.comment-item { background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:8px 10px; }
-.activity-item { padding:4px 0;border-bottom:1px solid #f3f4f6; }
-</style>
 
 <?php include 'includes/footer.php'; $db->close(); ?>
