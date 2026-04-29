@@ -62,6 +62,9 @@ include 'includes/header.php';
                             <span class="text-success fw-semibold"><?= $c['live_assets'] ?></span>/<?= $c['total_assets'] ?>
                         </td>
                         <td>
+                            <a href="campaign-detail.php?id=<?= $c['id'] ?>" class="btn btn-sm btn-outline-secondary me-1" title="View">
+                                <i class="fa fa-eye"></i>
+                            </a>
                             <button class="btn btn-sm btn-outline-primary me-1"
                                 onclick="editCampaign(<?= htmlspecialchars(json_encode($c)) ?>)">
                                 <i class="fa fa-pen"></i>

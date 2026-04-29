@@ -4,50 +4,71 @@ require_once 'includes/auth.php';
 $pageTitle = 'Dashboard';
 $db = getDB();
 
-$totalCampaigns  = $db->query("SELECT COUNT(*) c FROM campaigns")->fetch_assoc()['c'];
-$activeCampaigns = $db->query("SELECT COUNT(*) c FROM campaigns WHERE campaign_status='Active'")->fetch_assoc()['c'];
-$totalAssets     = $db->query("SELECT COUNT(*) c FROM assets WHERE archived=0")->fetch_assoc()['c'];
-$liveAssets      = $db->query("SELECT COUNT(*) c FROM assets WHERE status='Published / Live' AND archived=0")->fetch_assoc()['c'];
-$inReview        = $db->query("SELECT COUNT(*) c FROM assets WHERE status IN ('In Revision','In Review') AND archived=0")->fetch_assoc()['c'];
-$overdue         = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date < CURDATE() AND status NOT IN ('Published / Live','Live','Approved by Manager','Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
-$pendingAppr     = $db->query("SELECT COUNT(*) c FROM assets WHERE (approved_project_head='Pending' OR approved_manager='Pending') AND status NOT IN ('Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
-$dueThisWeek     = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Published / Live','Live','Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
+$uid     = (int)$_SESSION['user_id'];
+$isAdmin = in_array($_SESSION['user_role'] ?? '', ['Admin','Project Head','Manager']);
 
-$byType = $db->query("SELECT asset_type, COUNT(*) c FROM assets WHERE archived=0 GROUP BY asset_type");
-
-$recentAssets = $db->query("
-    SELECT a.*, c.campaign_name
-    FROM assets a
-    LEFT JOIN campaigns c ON c.id = a.campaign_ref
-    WHERE a.archived=0
-    ORDER BY a.created_at DESC LIMIT 12
-");
-
-$campaigns = $db->query("
-    SELECT c.*,
-        COUNT(a.id) total_assets,
-        SUM(a.status='Published / Live') live_assets
-    FROM campaigns c
-    LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0
-    GROUP BY c.id ORDER BY c.created_at DESC LIMIT 6
-");
+if ($isAdmin) {
+    // Global stats
+    $totalCampaigns  = $db->query("SELECT COUNT(*) c FROM campaigns")->fetch_assoc()['c'];
+    $activeCampaigns = $db->query("SELECT COUNT(*) c FROM campaigns WHERE campaign_status='Active'")->fetch_assoc()['c'];
+    $totalAssets     = $db->query("SELECT COUNT(*) c FROM assets WHERE archived=0")->fetch_assoc()['c'];
+    $liveAssets      = $db->query("SELECT COUNT(*) c FROM assets WHERE status='Published / Live' AND archived=0")->fetch_assoc()['c'];
+    $inReview        = $db->query("SELECT COUNT(*) c FROM assets WHERE status IN ('In Revision','In Review') AND archived=0")->fetch_assoc()['c'];
+    $overdue         = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date < CURDATE() AND status NOT IN ('Published / Live','Live','Approved by Manager','Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
+    $pendingAppr     = $db->query("SELECT COUNT(*) c FROM assets WHERE (approved_project_head='Pending' OR approved_manager='Pending') AND status NOT IN ('Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
+    $dueThisWeek     = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Published / Live','Live','Cancelled','Archived') AND archived=0")->fetch_assoc()['c'];
+    $byType          = $db->query("SELECT asset_type, COUNT(*) c FROM assets WHERE archived=0 GROUP BY asset_type");
+    $recentAssets    = $db->query("SELECT a.*, c.campaign_name FROM assets a LEFT JOIN campaigns c ON c.id=a.campaign_ref WHERE a.archived=0 ORDER BY a.created_at DESC LIMIT 12");
+    $campaigns       = $db->query("SELECT c.*, COUNT(a.id) total_assets, SUM(a.status='Published / Live') live_assets FROM campaigns c LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0 GROUP BY c.id ORDER BY c.created_at DESC LIMIT 6");
+} else {
+    // Personal stats
+    $totalCampaigns  = 0;
+    $activeCampaigns = 0;
+    $totalAssets     = $db->query("SELECT COUNT(*) c FROM assets WHERE archived=0 AND (owner_id=$uid OR created_by=$uid OR support_id=$uid)")->fetch_assoc()['c'];
+    $liveAssets      = $db->query("SELECT COUNT(*) c FROM assets WHERE status='Published / Live' AND archived=0 AND (owner_id=$uid OR created_by=$uid)")->fetch_assoc()['c'];
+    $inReview        = $db->query("SELECT COUNT(*) c FROM assets WHERE status IN ('In Revision','In Review') AND archived=0 AND owner_id=$uid")->fetch_assoc()['c'];
+    $overdue         = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date < CURDATE() AND status NOT IN ('Published / Live','Live','Approved by Manager','Cancelled','Archived') AND archived=0 AND owner_id=$uid")->fetch_assoc()['c'];
+    $myTasks         = $db->query("SELECT COUNT(*) c FROM tasks WHERE assigned_to=$uid AND status NOT IN ('Done')")->fetch_assoc()['c'];
+    $dueThisWeek     = $db->query("SELECT COUNT(*) c FROM assets WHERE due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Published / Live','Live','Cancelled','Archived') AND archived=0 AND owner_id=$uid")->fetch_assoc()['c'];
+    $byType          = $db->query("SELECT asset_type, COUNT(*) c FROM assets WHERE archived=0 AND (owner_id=$uid OR created_by=$uid) GROUP BY asset_type");
+    $recentAssets    = $db->query("SELECT a.*, c.campaign_name FROM assets a LEFT JOIN campaigns c ON c.id=a.campaign_ref WHERE a.archived=0 AND (a.owner_id=$uid OR a.created_by=$uid OR a.support_id=$uid) ORDER BY a.created_at DESC LIMIT 12");
+    $campaigns       = $db->query("SELECT c.*, COUNT(a.id) total_assets, SUM(a.status='Published / Live') live_assets FROM campaigns c LEFT JOIN assets a ON a.campaign_ref=c.id AND a.archived=0 WHERE c.campaign_owner=(SELECT name FROM users WHERE id=$uid LIMIT 1) GROUP BY c.id ORDER BY c.created_at DESC LIMIT 6");
+}
 
 include 'includes/header.php';
 ?>
 
+<?php if (!$isAdmin): ?>
+<div class="alert alert-info py-2 mb-4" style="font-size:.84rem;border-radius:10px;">
+    <i class="fa fa-user-circle me-2"></i>
+    Showing <strong>your personal stats</strong>. <a href="my-work.php" class="alert-link">View My Work</a> for full task board.
+</div>
+<?php endif; ?>
+
 <!-- KPI Stats -->
 <div class="row g-3 mb-4">
     <?php
-    $stats = [
-        ['num'=>$totalCampaigns,  'label'=>'Total Campaigns',    'icon'=>'fa-layer-group',    'color'=>'#3b82f6', 'bg'=>'#eff6ff'],
-        ['num'=>$activeCampaigns, 'label'=>'Active Campaigns',   'icon'=>'fa-rocket',         'color'=>'#10b981', 'bg'=>'#ecfdf5'],
-        ['num'=>$totalAssets,     'label'=>'Total Assets',       'icon'=>'fa-folder-open',    'color'=>'#8b5cf6', 'bg'=>'#f5f3ff'],
-        ['num'=>$liveAssets,      'label'=>'Published / Live',   'icon'=>'fa-circle-check',   'color'=>'#059669', 'bg'=>'#d1fae5'],
-        ['num'=>$inReview,        'label'=>'In Revision',        'icon'=>'fa-rotate',         'color'=>'#f59e0b', 'bg'=>'#fef3c7'],
-        ['num'=>$overdue,         'label'=>'Overdue',            'icon'=>'fa-triangle-exclamation','color'=>'#ef4444','bg'=>'#fee2e2'],
-        ['num'=>$pendingAppr,     'label'=>'Pending Approvals',  'icon'=>'fa-clock',          'color'=>'#6366f1', 'bg'=>'#eef2ff'],
-        ['num'=>$dueThisWeek,     'label'=>'Due This Week',      'icon'=>'fa-calendar-check', 'color'=>'#0891b2', 'bg'=>'#ecfeff'],
-    ];
+    if ($isAdmin) {
+        $stats = [
+            ['num'=>$totalCampaigns,  'label'=>'Total Campaigns',    'icon'=>'fa-layer-group',        'color'=>'#3b82f6', 'bg'=>'#eff6ff'],
+            ['num'=>$activeCampaigns, 'label'=>'Active Campaigns',   'icon'=>'fa-rocket',             'color'=>'#10b981', 'bg'=>'#ecfdf5'],
+            ['num'=>$totalAssets,     'label'=>'Total Assets',       'icon'=>'fa-folder-open',        'color'=>'#8b5cf6', 'bg'=>'#f5f3ff'],
+            ['num'=>$liveAssets,      'label'=>'Published / Live',   'icon'=>'fa-circle-check',       'color'=>'#059669', 'bg'=>'#d1fae5'],
+            ['num'=>$inReview,        'label'=>'In Revision',        'icon'=>'fa-rotate',             'color'=>'#f59e0b', 'bg'=>'#fef3c7'],
+            ['num'=>$overdue,         'label'=>'Overdue',            'icon'=>'fa-triangle-exclamation','color'=>'#ef4444', 'bg'=>'#fee2e2'],
+            ['num'=>$pendingAppr,     'label'=>'Pending Approvals',  'icon'=>'fa-clock',              'color'=>'#6366f1', 'bg'=>'#eef2ff'],
+            ['num'=>$dueThisWeek,     'label'=>'Due This Week',      'icon'=>'fa-calendar-check',     'color'=>'#0891b2', 'bg'=>'#ecfeff'],
+        ];
+    } else {
+        $stats = [
+            ['num'=>$totalAssets,  'label'=>'My Assets',         'icon'=>'fa-folder-open',        'color'=>'#8b5cf6', 'bg'=>'#f5f3ff'],
+            ['num'=>$liveAssets,   'label'=>'Published / Live',  'icon'=>'fa-circle-check',       'color'=>'#059669', 'bg'=>'#d1fae5'],
+            ['num'=>$inReview,     'label'=>'In Revision',       'icon'=>'fa-rotate',             'color'=>'#f59e0b', 'bg'=>'#fef3c7'],
+            ['num'=>$overdue,      'label'=>'Overdue',           'icon'=>'fa-triangle-exclamation','color'=>'#ef4444', 'bg'=>'#fee2e2'],
+            ['num'=>$myTasks,      'label'=>'Open Tasks',        'icon'=>'fa-list-check',         'color'=>'#3b82f6', 'bg'=>'#eff6ff'],
+            ['num'=>$dueThisWeek,  'label'=>'Due This Week',     'icon'=>'fa-calendar-check',     'color'=>'#0891b2', 'bg'=>'#ecfeff'],
+        ];
+    }
     foreach ($stats as $s):
     ?>
     <div class="col-6 col-sm-4 col-xl-3">
@@ -69,22 +90,23 @@ include 'includes/header.php';
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header">
-                <h6 class="mb-0">Assets by Tracker</h6>
+                <h6 class="mb-0"><?= $isAdmin ? 'Assets by Tracker' : 'My Work by Tracker' ?></h6>
             </div>
             <div class="card-body" style="padding:16px 18px;">
                 <?php
                 $typeCount = [];
                 while ($r = $byType->fetch_assoc()) $typeCount[$r['asset_type']] = $r['c'];
+                $baseCount = $isAdmin ? $totalAssets : $totalAssets;
                 foreach ($ASSET_TYPES as $navType => $navCfg):
                     $cnt = $typeCount[$navType] ?? 0;
-                    $pct = $totalAssets > 0 ? round(($cnt / $totalAssets) * 100) : 0;
+                    $pct = $baseCount > 0 ? round(($cnt / $baseCount) * 100) : 0;
                 ?>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span style="font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:7px;">
+                        <a href="assets.php?type=<?= $navType ?>" style="font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:7px;color:var(--text-primary);text-decoration:none;">
                             <span style="width:8px;height:8px;border-radius:50%;background:<?= $navCfg['color'] ?>;display:inline-block;flex-shrink:0;"></span>
                             <?= $navCfg['label'] ?>
-                        </span>
+                        </a>
                         <span style="font-size:.78rem;font-weight:600;color:#374151;"><?= $cnt ?></span>
                     </div>
                     <div class="progress" style="height:6px;border-radius:4px;">
@@ -100,7 +122,7 @@ include 'includes/header.php';
     <div class="col-lg-8">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Campaigns</h6>
+                <h6 class="mb-0"><?= $isAdmin ? 'Campaigns' : 'My Campaigns' ?></h6>
                 <a href="campaigns.php" class="btn btn-sm btn-primary">View All</a>
             </div>
             <div class="card-body p-0">
@@ -121,7 +143,7 @@ include 'includes/header.php';
                                 No campaigns yet. <a href="campaigns.php">Add one</a> or <a href="upload.php">import</a>.
                             </td></tr>
                         <?php else: while ($c = $campaigns->fetch_assoc()): ?>
-                            <tr>
+                            <tr style="cursor:pointer;" onclick="window.location='campaign-detail.php?id=<?= $c['id'] ?>'">
                                 <td><code class="id-code"><?= htmlspecialchars($c['campaign_id'] ?? '') ?></code></td>
                                 <td class="fw-semibold"><?= htmlspecialchars($c['campaign_name']) ?></td>
                                 <td class="d-none d-md-table-cell text-muted"><?= htmlspecialchars($c['campaign_owner'] ?? '-') ?></td>
@@ -141,7 +163,7 @@ include 'includes/header.php';
 <!-- Recent Assets -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0">Recent Assets</h6>
+        <h6 class="mb-0"><?= $isAdmin ? 'Recent Assets' : 'My Recent Assets' ?></h6>
         <a href="assets.php?type=creative" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;">Browse by Type</a>
     </div>
     <div class="card-body p-0">
@@ -162,11 +184,11 @@ include 'includes/header.php';
                         No assets yet. <a href="upload.php">Import from Excel</a>.
                     </td></tr>
                 <?php else: while ($a = $recentAssets->fetch_assoc()):
-                    $aCfg   = $ASSET_TYPES[$a['asset_type']] ?? ['label'=>$a['asset_type'],'color'=>'#6b7280','icon'=>'fa-file'];
-                    $overdue = $a['due_date'] && strtotime($a['due_date']) < time()
+                    $aCfg    = $ASSET_TYPES[$a['asset_type']] ?? ['label'=>$a['asset_type'],'color'=>'#6b7280','icon'=>'fa-file'];
+                    $isOver  = $a['due_date'] && strtotime($a['due_date']) < time()
                         && !in_array($a['status'],['Published / Live','Live','Approved by Manager','Cancelled','Archived']);
                 ?>
-                    <tr <?= $overdue?'class="table-danger"':'' ?>>
+                    <tr <?= $isOver?'class="table-danger"':'' ?>>
                         <td class="hide-xs"><code class="id-code"><?= htmlspecialchars($a['asset_id'] ?? '') ?></code></td>
                         <td class="fw-semibold"><?= htmlspecialchars($a['asset_name']) ?></td>
                         <td>
@@ -179,7 +201,7 @@ include 'includes/header.php';
                         <td class="d-none d-lg-table-cell text-muted"><?= htmlspecialchars($a['owner'] ?? '-') ?></td>
                         <td class="d-none d-md-table-cell text-muted">
                             <?= $a['due_date'] ? date('d M Y', strtotime($a['due_date'])) : '-' ?>
-                            <?php if ($overdue): ?> <span class="badge-pill" style="background:#fee2e2;color:#991b1b;">Overdue</span><?php endif; ?>
+                            <?php if ($isOver): ?><span class="badge-pill ms-1" style="background:#fee2e2;color:#991b1b;">Overdue</span><?php endif; ?>
                         </td>
                         <td><span class="badge-pill pri-<?= $a['priority'] ?>"><?= $a['priority'] ?></span></td>
                         <td><span class="badge-pill st-<?= str_replace([' ','/'],'_',$a['status']) ?>"><?= $a['status'] ?></span></td>

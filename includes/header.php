@@ -115,7 +115,7 @@
             position: sticky; top: 12px; z-index: 100;
         }
         .topbar-left  { display: flex; align-items: center; gap: 12px; }
-        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .topbar-right { display: flex; align-items: center; gap: 10px; position: relative; }
         .topbar h5 { margin: 0; font-weight: 700; color: var(--text-primary); font-size: .98rem; }
 
         .btn-hamburger {
@@ -399,9 +399,25 @@ $currentType = $_GET['type'] ?? '';
             <div class="topbar-date">
                 <i class="fa fa-calendar-days"></i><?= date('d M Y') ?>
             </div>
-            <div class="topbar-bell" title="Notifications">
+            <div class="topbar-bell" id="bellBtn" title="Notifications" onclick="toggleNotifPanel(event)">
                 <i class="fa fa-bell"></i>
-                <span class="bell-dot"></span>
+                <span class="bell-badge" id="bellBadge" style="display:none;position:absolute;top:3px;right:3px;
+                    min-width:16px;height:16px;border-radius:8px;background:#ef4444;color:#fff;
+                    font-size:.6rem;font-weight:700;line-height:16px;text-align:center;padding:0 3px;
+                    border:2px solid var(--card-bg);"></span>
+            </div>
+            <!-- Notification panel -->
+            <div id="notifPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;
+                width:340px;max-height:480px;overflow-y:auto;
+                background:#fff;border:1px solid var(--border);border-radius:12px;
+                box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:999;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+                    <span style="font-weight:600;font-size:.88rem;">Notifications</span>
+                    <button onclick="markAllRead()" style="font-size:.75rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;">Mark all read</button>
+                </div>
+                <div id="notifList" style="padding:8px 0;">
+                    <div class="text-center text-muted py-4" style="font-size:.82rem;">Loading…</div>
+                </div>
             </div>
             <div class="topbar-user" id="userMenuBtn">
                 <div class="user-avatar-sm"><?= strtoupper(substr($_SESSION['user_name'] ?? 'U', 0, 2)) ?></div>
@@ -419,9 +435,86 @@ $currentType = $_GET['type'] ?? '';
     document.getElementById('userMenuBtn').addEventListener('click', function(e) {
         e.stopPropagation();
         document.getElementById('userDropdown').classList.toggle('open');
+        document.getElementById('notifPanel').style.display = 'none';
     });
     document.addEventListener('click', function() {
         document.getElementById('userDropdown').classList.remove('open');
+        document.getElementById('notifPanel').style.display = 'none';
     });
+
+    // Notifications
+    let notifLoaded = false;
+    function loadNotifCount() {
+        fetch('api/notification_api.php?action=count')
+            .then(r => r.json())
+            .then(res => {
+                const badge = document.getElementById('bellBadge');
+                if (res.success && res.count > 0) {
+                    badge.textContent = res.count > 9 ? '9+' : res.count;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }).catch(() => {});
+    }
+    loadNotifCount();
+
+    function toggleNotifPanel(e) {
+        e.stopPropagation();
+        const panel = document.getElementById('notifPanel');
+        document.getElementById('userDropdown').classList.remove('open');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            if (!notifLoaded) loadNotifList();
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function loadNotifList() {
+        notifLoaded = true;
+        fetch('api/notification_api.php?action=list')
+            .then(r => r.json())
+            .then(res => {
+                const el = document.getElementById('notifList');
+                if (!res.success || !res.data.length) {
+                    el.innerHTML = '<div class="text-center text-muted py-4" style="font-size:.82rem;">No notifications</div>';
+                    return;
+                }
+                el.innerHTML = res.data.map(n => `
+                    <div onclick="markRead(${n.id}, this)" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #f3f4f6;
+                        background:${n.is_read=='0'?'#f0f7ff':'#fff'};transition:background .15s;">
+                        <div style="font-size:.82rem;font-weight:${n.is_read=='0'?'600':'400'};color:#111827;line-height:1.4;">${escHtml(n.title || n.type || 'Notification')}</div>
+                        ${n.message ? `<div style="font-size:.78rem;color:#6b7280;margin-top:2px;">${escHtml(n.message)}</div>` : ''}
+                        <div style="font-size:.72rem;color:#9ca3af;margin-top:4px;">${timeAgo(n.created_at)}</div>
+                    </div>`).join('');
+            }).catch(() => {
+                document.getElementById('notifList').innerHTML = '<div class="text-center text-muted py-4" style="font-size:.82rem;">Failed to load</div>';
+            });
+    }
+
+    function markRead(id, el) {
+        const fd = new FormData(); fd.append('action','mark_read'); fd.append('id',id);
+        fetch('api/notification_api.php', { method:'POST', body:fd });
+        el.style.background = '#fff';
+        el.style.fontWeight = '400';
+        loadNotifCount();
+    }
+
+    function markAllRead() {
+        const fd = new FormData(); fd.append('action','mark_read');
+        fetch('api/notification_api.php', { method:'POST', body:fd })
+            .then(() => { notifLoaded = false; loadNotifList(); loadNotifCount(); });
+    }
+
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function timeAgo(ts) {
+        const d = new Date(ts.replace(' ','T')+'Z'), now = new Date();
+        const diff = Math.floor((now - d) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+        return Math.floor(diff/86400) + 'd ago';
+    }
     </script>
 
