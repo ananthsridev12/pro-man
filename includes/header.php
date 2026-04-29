@@ -361,6 +361,15 @@ $currentType = $_GET['type'] ?? '';
         <a href="campaigns.php" class="<?= $currentPage==='campaigns.php'?'active':'' ?>" onclick="closeSidebar()">
             <span class="nav-icon"><i class="fa fa-layer-group fa-fw"></i></span> Campaign Master
         </a>
+        <a href="kanban.php" class="<?= $currentPage==='kanban.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-table-columns fa-fw"></i></span> Kanban
+        </a>
+        <a href="timeline.php" class="<?= $currentPage==='timeline.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-chart-gantt fa-fw"></i></span> Timeline
+        </a>
+        <a href="search.php" class="<?= $currentPage==='search.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-magnifying-glass fa-fw"></i></span> Search
+        </a>
 
         <div class="sidebar-divider"></div>
         <div class="sidebar-section">Asset Trackers</div>
@@ -396,6 +405,9 @@ $currentType = $_GET['type'] ?? '';
             <h5><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h5>
         </div>
         <div class="topbar-right">
+            <a href="search.php" class="topbar-bell" title="Search (press /)" style="text-decoration:none;">
+                <i class="fa fa-magnifying-glass"></i>
+            </a>
             <div class="topbar-date">
                 <i class="fa fa-calendar-days"></i><?= date('d M Y') ?>
             </div>

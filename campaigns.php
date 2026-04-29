@@ -14,6 +14,9 @@ $campaigns = $db->query("
     GROUP BY c.id ORDER BY c.created_at DESC
 ");
 $activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name ASC");
+$projects    = $db->query("SELECT id, code, name, color FROM projects WHERE status='active' ORDER BY name ASC");
+$projectList = [];
+while ($p = $projects->fetch_assoc()) $projectList[] = $p;
 
 include 'includes/header.php';
 ?>
@@ -108,13 +111,20 @@ include 'includes/header.php';
                             <input type="text" class="form-control" name="campaign_name" id="cName" required>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">Vertical <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">Project / Vertical <span class="text-danger">*</span></label>
                             <select class="form-select" name="vertical" id="cVertical" onchange="updateIdPreview()">
                                 <option value="">-- Select --</option>
-                                <?php foreach ($VERTICALS as $code => $label): ?>
+                                <?php foreach ($projectList as $p): ?>
+                                    <option value="<?= htmlspecialchars($p['code']) ?>"
+                                        data-project-id="<?= $p['id'] ?>">
+                                        <?= htmlspecialchars($p['code']) ?> — <?= htmlspecialchars($p['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                                <?php foreach ($VERTICALS as $code => $label): if (array_filter($projectList, fn($p)=>$p['code']===$code)) continue; ?>
                                     <option value="<?= $code ?>"><?= $code ?> — <?= $label ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <input type="hidden" name="project_id" id="cProjectId">
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold">Goal Code <span class="text-danger">*</span></label>
@@ -220,7 +230,11 @@ include 'includes/header.php';
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 function updateIdPreview() {
-    const v = document.getElementById('cVertical').value;
+    const sel = document.getElementById('cVertical');
+    const v   = sel.value;
+    const opt = sel.options[sel.selectedIndex];
+    const pid = opt ? (opt.dataset.projectId || '') : '';
+    document.getElementById('cProjectId').value = pid;
     const g = document.getElementById('cGoalCode').value;
     const d = document.getElementById('cDescriptor').value.trim().toUpperCase().replace(/[^A-Z0-9\-]/g,'').replace(/\s+/g,'-');
     const now = new Date();
@@ -235,6 +249,7 @@ function editCampaign(c) {
     document.getElementById('cId').value          = c.id;
     document.getElementById('cName').value         = c.campaign_name;
     document.getElementById('cVertical').value     = c.vertical || '';
+    document.getElementById('cProjectId').value    = c.project_id || '';
     document.getElementById('cGoalCode').value     = c.goal_code || '';
     document.getElementById('cDescriptor').value   = c.descriptor || '';
     document.getElementById('cType').value         = c.campaign_type || '';

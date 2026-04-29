@@ -22,6 +22,8 @@ $fields = ['vertical','goal_code','campaign_goal','target_audience','geography',
            'campaign_start','campaign_end','go_live_date','priority','campaign_owner',
            'campaign_status','notes','descriptor'];
 
+$project_id = (int)($_POST['project_id'] ?? 0);
+
 $sets = ["campaign_name='" . $db->real_escape_string($name) . "'"];
 foreach ($fields as $f) {
     $val = trim($_POST[$f] ?? '');
@@ -31,6 +33,8 @@ foreach ($fields as $f) {
         $sets[] = "$f='" . $db->real_escape_string($val) . "'";
     }
 }
+
+if ($project_id) $sets[] = "project_id=$project_id";
 
 if ($id) {
     $db->query("UPDATE campaigns SET " . implode(',', $sets) . " WHERE id=$id");
