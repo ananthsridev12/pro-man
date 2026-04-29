@@ -33,12 +33,10 @@ include 'includes/header.php';
                         <th class="hide-xs">Campaign ID</th><th>Campaign Name</th>
                         <th class="d-none d-md-table-cell">Vertical</th>
                         <th class="d-none d-lg-table-cell">Type</th>
-                        <th class="d-none d-lg-table-cell">Owner</th>
+                        <th class="d-none d-lg-table-cell">Assigned To</th>
                         <th class="d-none d-md-table-cell">Go-Live</th>
                         <th>Priority</th><th>Status</th>
-                        <th class="d-none d-xl-table-cell">PH Appr.</th>
-                        <th class="d-none d-xl-table-cell">Mgr Appr.</th>
-                        <th class="d-none d-sm-table-cell">Assets</th>
+                        <th class="d-none d-sm-table-cell">Requirements</th>
                         <th style="min-width:80px;">Actions</th>
                     </tr>
                 </thead>
@@ -60,14 +58,6 @@ include 'includes/header.php';
                         <td class="d-none d-md-table-cell text-muted"><?= $c['go_live_date'] ? date('d M Y', strtotime($c['go_live_date'])) : '-' ?></td>
                         <td><span class="badge-pill pri-<?= $c['priority'] ?>"><?= $c['priority'] ?></span></td>
                         <td><span class="badge-pill cs-<?= str_replace([' ','/'],'_',$c['campaign_status']) ?>"><?= $c['campaign_status'] ?></span></td>
-                        <td class="d-none d-xl-table-cell">
-                            <?php $aph = $c['approved_project_head']; ?>
-                            <span class="badge-pill appr-<?= str_replace(' ','-',$aph) ?>"><?= $aph ?></span>
-                        </td>
-                        <td class="d-none d-xl-table-cell">
-                            <?php $amg = $c['approved_manager']; ?>
-                            <span class="badge-pill appr-<?= str_replace(' ','-',$amg) ?>"><?= $amg ?></span>
-                        </td>
                         <td class="d-none d-sm-table-cell">
                             <span class="text-success fw-semibold"><?= $c['live_assets'] ?></span>/<?= $c['total_assets'] ?>
                         </td>
@@ -192,8 +182,8 @@ include 'includes/header.php';
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Campaign Owner</label>
-                            <select class="form-select" name="campaign_owner" id="cOwner">
+                            <label class="form-label fw-semibold">Assigned To <span class="text-danger">*</span></label>
+                            <select class="form-select" name="campaign_owner" id="cOwner" required>
                                 <option value="">-- Select User --</option>
                                 <?php $activeUsers->data_seek(0); while ($u = $activeUsers->fetch_assoc()): ?>
                                     <option value="<?= htmlspecialchars($u['name']) ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role']) ?>)</option>
@@ -205,24 +195,6 @@ include 'includes/header.php';
                             <select class="form-select" name="campaign_status" id="cStatus">
                                 <?php foreach ($CAMPAIGN_STATUSES as $s): ?>
                                     <option value="<?= $s ?>"><?= $s ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <!-- Row 5: Approvals -->
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Approved by Project Head</label>
-                            <select class="form-select" name="approved_project_head" id="cApprPH">
-                                <?php foreach ($APPROVAL_OPTS as $o): ?>
-                                    <option value="<?= $o ?>"><?= $o ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Approved by Manager</label>
-                            <select class="form-select" name="approved_manager" id="cApprMgr">
-                                <?php foreach ($APPROVAL_OPTS as $o): ?>
-                                    <option value="<?= $o ?>"><?= $o ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -272,8 +244,6 @@ function editCampaign(c) {
     document.getElementById('cPriority').value     = c.priority || 'Medium';
     document.getElementById('cOwner').value        = c.campaign_owner || '';
     document.getElementById('cStatus').value       = c.campaign_status || 'Planning';
-    document.getElementById('cApprPH').value       = c.approved_project_head || 'Pending';
-    document.getElementById('cApprMgr').value      = c.approved_manager || 'Pending';
     document.getElementById('cNotes').value        = c.notes || '';
     // Show existing ID in preview bar
     document.getElementById('idPreview').textContent = c.campaign_id || '—';

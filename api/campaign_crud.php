@@ -20,7 +20,7 @@ if (!$name) { echo json_encode(['success'=>false,'message'=>'Campaign name is re
 
 $fields = ['vertical','goal_code','campaign_goal','target_audience','geography','campaign_type',
            'campaign_start','campaign_end','go_live_date','priority','campaign_owner',
-           'campaign_status','approved_project_head','approved_manager','notes','descriptor'];
+           'campaign_status','notes','descriptor'];
 
 $sets = ["campaign_name='" . $db->real_escape_string($name) . "'"];
 foreach ($fields as $f) {
