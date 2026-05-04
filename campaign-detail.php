@@ -38,6 +38,54 @@ $uid    = (int)$_SESSION['user_id'];
 $isAdmin = in_array($_SESSION['user_role'] ?? '', ['Admin','Project Head','Manager']);
 $activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name");
 
+// Lead times
+$leadTimes = [];
+$ltRes = $db->query("SELECT asset_type, days_before_golive FROM asset_lead_times");
+if ($ltRes) while ($lt = $ltRes->fetch_assoc()) $leadTimes[$lt['asset_type']] = (int)$lt['days_before_golive'];
+
+// Approval state
+$approvalStatus   = $campaign['approval_status'] ?? 'Draft';
+$approvalInstance = null;
+$approvalStages   = [];
+$canSubmit        = false;
+$canApprove       = false;
+$pendingAction    = null;
+
+$inst = $db->query("SELECT * FROM approval_instances WHERE entity_type='campaign' AND entity_id=$id ORDER BY id DESC LIMIT 1")->fetch_assoc();
+if ($inst) {
+    $approvalInstance = $inst;
+    $iid = (int)$inst['id'];
+    $stagesRes = $db->query("
+        SELECT s.*, u.name AS approver_name,
+               aa.action AS act, aa.id AS action_id,
+               aa.comments AS act_comments, aa.acted_at,
+               ua.name AS actor_name
+        FROM approval_stages s
+        LEFT JOIN approval_actions aa ON aa.instance_id=$iid AND aa.stage_id=s.id
+        LEFT JOIN users ua ON ua.id = aa.approver_user_id
+        LEFT JOIN users u  ON u.id  = s.approver_user_id
+        WHERE s.pipeline_id={$inst['pipeline_id']}
+        ORDER BY s.stage_order ASC
+    ");
+    if ($stagesRes) while ($s = $stagesRes->fetch_assoc()) $approvalStages[] = $s;
+
+    if ($inst['status'] === 'pending') {
+        foreach ($approvalStages as $s) {
+            if ((int)$s['stage_order'] === (int)$inst['current_stage_order'] && ($s['act'] ?? 'pending') === 'pending') {
+                if ((int)$s['approver_user_id'] === $uid || (!$s['approver_user_id'] && $s['approver_role'] === ($_SESSION['user_role'] ?? ''))) {
+                    $canApprove  = true;
+                    $pendingAction = $s;
+                }
+                break;
+            }
+        }
+    }
+}
+
+if (in_array($approvalStatus, ['Draft','Rejected'])) {
+    $canSubmit = $isAdmin || ($campaign['campaign_owner'] === ($_SESSION['user_name'] ?? ''));
+}
+
 include 'includes/header.php';
 ?>
 
@@ -112,6 +160,125 @@ include 'includes/header.php';
         </div>
     </div>
     <?php endforeach; ?>
+</div>
+
+<!-- Approval Status Bar -->
+<?php
+$apBg    = ['Draft'=>'#f3f4f6','Submitted'=>'#dbeafe','Approved'=>'#dcfce7','Rejected'=>'#fee2e2'];
+$apColor = ['Draft'=>'#6b7280','Submitted'=>'#1d4ed8','Approved'=>'#15803d','Rejected'=>'#dc2626'];
+$apStatusKey = preg_replace('/\s*\(.*\)/','',$approvalStatus); // strip "(Stage N of M)"
+?>
+<div class="card mb-4">
+    <div class="card-body py-3 px-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <span style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;">Approval</span>
+                <span style="background:<?= $apBg[$apStatusKey] ?? '#f3f4f6' ?>;color:<?= $apColor[$apStatusKey] ?? '#6b7280' ?>;
+                    padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;">
+                    <?= htmlspecialchars($approvalStatus) ?>
+                </span>
+
+                <?php if (!empty($approvalStages) && $approvalInstance): ?>
+                <div class="d-flex align-items-center gap-1 ms-1">
+                    <?php foreach ($approvalStages as $i => $s):
+                        $act = $s['act'] ?? 'pending';
+                        $isCurrent = (int)$s['stage_order'] === (int)($approvalInstance['current_stage_order'] ?? 1);
+                        $dotBg  = $act==='approved' ? '#dcfce7' : ($act==='rejected' ? '#fee2e2' : ($isCurrent ? '#dbeafe' : '#f3f4f6'));
+                        $dotCol = $act==='approved' ? '#15803d' : ($act==='rejected' ? '#dc2626' : ($isCurrent ? '#2563eb' : '#9ca3af'));
+                    ?>
+                    <?php if ($i > 0): ?><span style="width:18px;height:2px;background:#e5e7eb;flex-shrink:0;"></span><?php endif; ?>
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;" title="<?= htmlspecialchars($s['stage_name']) ?>">
+                        <div style="width:26px;height:26px;border-radius:50%;background:<?= $dotBg ?>;color:<?= $dotCol ?>;
+                            display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;
+                            border:2px solid <?= $dotCol ?>;">
+                            <?php if ($act==='approved'): ?><i class="fa fa-check"></i>
+                            <?php elseif ($act==='rejected'): ?><i class="fa fa-xmark"></i>
+                            <?php else: ?><?= $s['stage_order'] ?><?php endif; ?>
+                        </div>
+                        <span style="font-size:.58rem;color:var(--text-muted);white-space:nowrap;max-width:56px;overflow:hidden;text-overflow:ellipsis;">
+                            <?= htmlspecialchars($s['stage_name']) ?>
+                        </span>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($approvalStatus === 'Rejected' && !empty($approvalStages)):
+                    foreach (array_reverse($approvalStages) as $s):
+                        if ($s['act'] === 'rejected' && $s['act_comments']): ?>
+                <span class="ms-2" style="font-size:.79rem;color:#dc2626;">
+                    <i class="fa fa-comment-slash me-1"></i><?= htmlspecialchars(mb_substr($s['act_comments'],0,70)) ?><?= mb_strlen($s['act_comments'])>70?'…':'' ?>
+                </span>
+                <?php break; endif; endforeach; endif; ?>
+            </div>
+
+            <?php if ($canSubmit): ?>
+            <button class="btn btn-sm btn-primary" onclick="submitForApproval()">
+                <i class="fa fa-paper-plane me-1"></i>
+                <?= $approvalStatus === 'Rejected' ? 'Re-submit for Approval' : 'Submit for Approval' ?>
+            </button>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($canApprove && $pendingAction): ?>
+        <div class="mt-3 pt-3" style="border-top:1px solid var(--border);">
+            <p class="fw-semibold mb-2" style="font-size:.84rem;">
+                <i class="fa fa-gavel me-1 text-primary"></i>
+                Stage <?= $pendingAction['stage_order'] ?>: <?= htmlspecialchars($pendingAction['stage_name']) ?> — Your approval is needed
+            </p>
+            <textarea id="approvalComment" class="form-control form-control-sm mb-2" rows="2"
+                placeholder="Comments (optional for approval, required for rejection)"></textarea>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success btn-sm" onclick="doApprovalAction('approve')">
+                    <i class="fa fa-check me-1"></i> Approve
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="doApprovalAction('reject')">
+                    <i class="fa fa-xmark me-1"></i> Reject
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($approvalStages)): ?>
+        <div class="mt-3 pt-2" style="border-top:1px solid var(--border);">
+            <button class="btn btn-link btn-sm p-0 text-muted text-decoration-none" type="button"
+                data-bs-toggle="collapse" data-bs-target="#approvalHistory" style="font-size:.8rem;">
+                <i class="fa fa-history me-1"></i> View Approval History
+            </button>
+            <div class="collapse mt-2" id="approvalHistory">
+                <div class="border rounded p-3" style="background:#f9fafb;font-size:.82rem;">
+                    <?php foreach ($approvalStages as $s):
+                        $act     = $s['act'] ?? 'pending';
+                        $actCls  = $act==='approved' ? 'text-success' : ($act==='rejected' ? 'text-danger' : 'text-muted');
+                        $actIcon = $act==='approved' ? 'fa-circle-check' : ($act==='rejected' ? 'fa-circle-xmark' : 'fa-clock');
+                    ?>
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <i class="fa <?= $actIcon ?> <?= $actCls ?> mt-1" style="flex-shrink:0;"></i>
+                        <div>
+                            <strong>Stage <?= $s['stage_order'] ?>: <?= htmlspecialchars($s['stage_name']) ?></strong>
+                            <?php if ($s['approver_role']): ?>
+                                <span class="text-muted">(<?= htmlspecialchars($s['approver_role']) ?>)</span>
+                            <?php elseif ($s['approver_name']): ?>
+                                <span class="text-muted">(<?= htmlspecialchars($s['approver_name']) ?>)</span>
+                            <?php endif; ?>
+                            — <span class="<?= $actCls ?>"><?= ucfirst($act) ?></span>
+                            <?php if ($s['acted_at']): ?>
+                                <span class="text-muted">· <?= date('d M Y, H:i', strtotime($s['acted_at'])) ?></span>
+                            <?php endif; ?>
+                            <?php if ($s['actor_name']): ?>
+                                <span class="text-muted">by <?= htmlspecialchars($s['actor_name']) ?></span>
+                            <?php endif; ?>
+                            <?php if ($s['act_comments']): ?>
+                                <div class="text-muted mt-1 fst-italic">"<?= htmlspecialchars($s['act_comments']) ?>"</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- Requirements by Type -->
@@ -407,6 +574,9 @@ include 'includes/header.php';
 
 <script>
 const ASSET_TYPES_JS = <?= json_encode(array_map(fn($v)=>['label'=>$v['label'],'extra'=>$v['extra'] ?? []], $ASSET_TYPES)) ?>;
+const LEAD_TIMES = <?= json_encode($leadTimes) ?>;
+const GO_LIVE    = '<?= $campaign['go_live_date'] ?? '' ?>';
+const CAMPAIGN_ID = <?= $id ?>;
 const ACTIVE_USERS_JS = <?php
     $activeUsers->data_seek(0);
     $ul = [];
@@ -427,6 +597,12 @@ function openAddRequirement() {
     document.getElementById('assetForm').reset();
     document.getElementById('aId').value = '';
     document.getElementById('aType').value = type;
+    // Auto-calculate due date from lead times
+    if (GO_LIVE && LEAD_TIMES[type]) {
+        const d = new Date(GO_LIVE + 'T00:00:00');
+        d.setDate(d.getDate() - LEAD_TIMES[type]);
+        document.getElementById('aDueDate').value = d.toISOString().split('T')[0];
+    }
     buildExtraFields(type, {});
     new bootstrap.Modal(document.getElementById('assetModal')).show();
 }
@@ -506,6 +682,29 @@ function editCampaign(c) {
     document.getElementById('cStatus').value      = c.campaign_status || 'Planning';
     document.getElementById('cNotes').value       = c.notes || '';
     new bootstrap.Modal(document.getElementById('campaignModal')).show();
+}
+
+function submitForApproval() {
+    if (!confirm('Submit this campaign for approval?')) return;
+    const fd = new FormData();
+    fd.append('action', 'submit');
+    fd.append('campaign_id', CAMPAIGN_ID);
+    fetch('api/approval_action.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => { if (res.success) location.reload(); else alert(res.message || 'Error submitting for approval.'); });
+}
+
+function doApprovalAction(action) {
+    const comment = document.getElementById('approvalComment').value.trim();
+    if (action === 'reject' && !comment) { alert('Please add a comment explaining the rejection.'); return; }
+    if (!confirm(action === 'approve' ? 'Approve this stage?' : 'Reject this campaign?')) return;
+    const fd = new FormData();
+    fd.append('action', action);
+    fd.append('campaign_id', CAMPAIGN_ID);
+    fd.append('comment', comment);
+    fetch('api/approval_action.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => { if (res.success) location.reload(); else alert(res.message || 'Error'); });
 }
 
 document.getElementById('campaignForm').addEventListener('submit', function(e) {

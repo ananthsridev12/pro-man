@@ -32,23 +32,22 @@ $overdue = $db->query("
     LIMIT 20
 ");
 
-// Pending approvals — role-aware
+// Pending approvals — pipeline-based
 $role = $_SESSION['user_role'] ?? '';
-if (in_array($role, ['Admin','Project Head'])) {
-    $pendingWhere = "a.approved_project_head='Pending'";
-} elseif ($role === 'Manager') {
-    $pendingWhere = "a.approved_manager='Pending'";
-} else {
-    // Regular users: only their own assets awaiting approval (so they know what's blocked)
-    $pendingWhere = "(a.approved_project_head='Pending' OR a.approved_manager='Pending') AND (a.owner_id=$uid OR a.created_by=$uid)";
-}
+$roleEsc = addslashes($role);
 $pending = $db->query("
-    SELECT a.id, a.asset_id AS a_code, a.asset_name, a.asset_type, a.due_date,
-           a.approved_project_head, a.approved_manager
-    FROM assets a
-    WHERE ($pendingWhere)
-      AND a.status NOT IN ('Cancelled')
-    ORDER BY a.due_date ASC
+    SELECT ai.id AS instance_id, ai.current_stage_order, ast.stage_name,
+           c.id AS camp_id, c.campaign_name, c.campaign_id AS camp_code,
+           ai.initiated_at
+    FROM approval_instances ai
+    JOIN approval_stages ast
+        ON ast.pipeline_id = ai.pipeline_id
+        AND ast.stage_order = ai.current_stage_order
+    JOIN campaigns c ON c.id = ai.entity_id
+    WHERE ai.status = 'pending'
+      AND (ast.approver_user_id = $uid
+           OR (ast.approver_user_id IS NULL AND ast.approver_role = '$roleEsc'))
+    ORDER BY ai.initiated_at ASC
     LIMIT 20
 ");
 
@@ -167,31 +166,37 @@ $priorityBadge = ['High'=>'danger','Medium'=>'warning','Low'=>'secondary','Criti
 <?php endif; ?>
 
 <!-- Pending Approvals -->
-<?php if ($pending->num_rows > 0): ?>
+<?php if ($pending && $pending->num_rows > 0): ?>
 <div class="card">
     <div class="card-header bg-white py-2">
         <span class="fw-semibold" style="font-size:.88rem;">
-            <i class="fa fa-clock me-1 text-warning"></i>
-            <?php if (in_array($role,['Admin','Project Head'])): ?>Awaiting My PH Approval
-            <?php elseif ($role==='Manager'): ?>Awaiting My Manager Approval
-            <?php else: ?>My Assets Pending Approval<?php endif; ?>
+            <i class="fa fa-clock me-1 text-warning"></i> Campaigns Awaiting My Approval
         </span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0" style="font-size:.83rem;">
                 <thead class="table-light">
-                    <tr><th>Asset</th><th>Type</th><th>Due</th><th>PH Approval</th><th>Mgr Approval</th></tr>
+                    <tr><th>Campaign</th><th>Stage</th><th>Submitted</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                 <?php while ($a = $pending->fetch_assoc()): ?>
                 <tr>
-                    <td><span class="fw-semibold"><?= htmlspecialchars($a['asset_name']) ?></span>
-                        <br><code style="font-size:.72rem;"><?= htmlspecialchars($a['a_code']) ?></code></td>
-                    <td><?= htmlspecialchars($a['asset_type']) ?></td>
-                    <td><?= $a['due_date'] ? date('d M Y', strtotime($a['due_date'])) : '—' ?></td>
-                    <td><span class="appr-<?= str_replace(' ','-',$a['approved_project_head']) ?>"><?= $a['approved_project_head'] ?></span></td>
-                    <td><span class="appr-<?= str_replace(' ','-',$a['approved_manager']) ?>"><?= $a['approved_manager'] ?></span></td>
+                    <td>
+                        <span class="fw-semibold"><?= htmlspecialchars($a['campaign_name']) ?></span>
+                        <br><code style="font-size:.72rem;"><?= htmlspecialchars($a['camp_code']) ?></code>
+                    </td>
+                    <td>
+                        <span style="font-size:.78rem;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:10px;">
+                            Stage <?= $a['current_stage_order'] ?>: <?= htmlspecialchars($a['stage_name']) ?>
+                        </span>
+                    </td>
+                    <td class="text-muted"><?= date('d M Y', strtotime($a['initiated_at'])) ?></td>
+                    <td>
+                        <a href="campaign-detail.php?id=<?= $a['camp_id'] ?>" class="btn btn-sm btn-outline-primary">
+                            <i class="fa fa-eye me-1"></i> Review
+                        </a>
+                    </td>
                 </tr>
                 <?php endwhile; ?>
                 </tbody>

@@ -242,22 +242,6 @@ include 'includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Approved by PH</label>
-                            <select class="form-select" name="approved_project_head" id="aApprPH">
-                                <?php foreach ($APPROVAL_OPTS as $o): ?>
-                                    <option><?= $o ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Approved by Manager</label>
-                            <select class="form-select" name="approved_manager" id="aApprMgr">
-                                <?php foreach ($APPROVAL_OPTS as $o): ?>
-                                    <option><?= $o ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold">Revision #</label>
                             <input type="number" class="form-control" name="revision_no" id="aRevNo" min="0" value="0">

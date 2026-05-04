@@ -28,8 +28,6 @@ $support_id   = (int)($_POST['support_id'] ?? 0);
 $requested_by = $db->real_escape_string(trim($_POST['requested_by'] ?? ''));
 $priority     = $db->real_escape_string($_POST['priority'] ?? 'Medium');
 $status       = $db->real_escape_string($_POST['status'] ?? 'Briefed');
-$appr_ph      = $db->real_escape_string($_POST['approved_project_head'] ?? 'Pending');
-$appr_mgr     = $db->real_escape_string($_POST['approved_manager'] ?? 'Pending');
 $revision_no  = (int)($_POST['revision_no'] ?? 0);
 $final_url    = $db->real_escape_string(trim($_POST['final_file_url'] ?? ''));
 $feedback     = $db->real_escape_string(trim($_POST['feedback_notes'] ?? ''));
@@ -66,7 +64,7 @@ $extra_json = $db->real_escape_string(json_encode($extra));
 $uid = (int)$_SESSION['user_id'];
 
 if ($id) {
-    $old = $db->query("SELECT status, approved_project_head, approved_manager, owner_id FROM assets WHERE id=$id")->fetch_assoc();
+    $old = $db->query("SELECT status, owner_id FROM assets WHERE id=$id")->fetch_assoc();
 
     $db->query("UPDATE assets SET
         asset_type='$asset_type_e', asset_name='$asset_name_e',
@@ -76,7 +74,6 @@ if ($id) {
         requested_by='$requested_by',
         brief_date=$brief_date, due_date=$due_date, pub_date=$pub_date,
         priority='$priority', status='$status',
-        approved_project_head='$appr_ph', approved_manager='$appr_mgr',
         revision_no=$revision_no, final_file_url='$final_url',
         feedback_notes='$feedback', extra_data='$extra_json'
         WHERE id=$id");
@@ -85,10 +82,8 @@ if ($id) {
 
     // Activity log
     $changes = [
-        'status'                => [$old['status'], $status],
-        'approved_project_head' => [$old['approved_project_head'], $appr_ph],
-        'approved_manager'      => [$old['approved_manager'], $appr_mgr],
-        'owner_id'              => [$old['owner_id'], $owner_id ?: null],
+        'status'   => [$old['status'], $status],
+        'owner_id' => [$old['owner_id'], $owner_id ?: null],
     ];
     foreach ($changes as $field => [$oldVal, $newVal]) {
         if ((string)$oldVal !== (string)$newVal) {
@@ -122,14 +117,12 @@ if ($id) {
         (asset_type, asset_name, asset_id, campaign_ref, vertical,
          owner, owner_id, support, support_id, requested_by,
          brief_date, due_date, pub_date, priority, status,
-         approved_project_head, approved_manager, revision_no,
-         final_file_url, feedback_notes, extra_data, created_by)
+         revision_no, final_file_url, feedback_notes, extra_data, created_by)
         VALUES
         ('$asset_type_e','$asset_name_e','$assetId_e',$campaign_ref,'$vertical',
          '$owner_name',$owner_id_sql,'$support_name',$support_id_sql,'$requested_by',
          $brief_date,$due_date,$pub_date,'$priority','$status',
-         '$appr_ph','$appr_mgr',$revision_no,
-         '$final_url','$feedback','$extra_json',$uid)");
+         $revision_no,'$final_url','$feedback','$extra_json',$uid)");
 
     if ($db->error) { echo json_encode(['success'=>false,'message'=>$db->error]); $db->close(); exit; }
 

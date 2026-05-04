@@ -393,6 +393,14 @@ $currentType = $_GET['type'] ?? '';
         <a href="upload.php" class="<?= $currentPage==='upload.php'?'active':'' ?>" onclick="closeSidebar()">
             <span class="nav-icon"><i class="fa fa-file-import fa-fw"></i></span> Import Excel
         </a>
+        <?php if (($_SESSION['user_role'] ?? '') === 'Admin'): ?>
+        <a href="settings-lead-times.php" class="<?= $currentPage==='settings-lead-times.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-clock fa-fw"></i></span> Asset Lead Times
+        </a>
+        <a href="settings-pipeline.php" class="<?= $currentPage==='settings-pipeline.php'?'active':'' ?>" onclick="closeSidebar()">
+            <span class="nav-icon"><i class="fa fa-diagram-successor fa-fw"></i></span> Approval Pipeline
+        </a>
+        <?php endif; ?>
     </nav>
 </div>
 
