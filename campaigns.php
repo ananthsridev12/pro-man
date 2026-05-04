@@ -218,6 +218,9 @@ include 'includes/header.php';
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <a id="openDetailBtn" href="#" class="btn btn-outline-secondary me-auto" style="display:none;">
+                        <i class="fa fa-eye me-1"></i>Open
+                    </a>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Campaign</button>
                 </div>
@@ -265,6 +268,9 @@ function editCampaign(c) {
     document.getElementById('cNotes').value        = c.notes || '';
     // Show existing ID in preview bar
     document.getElementById('idPreview').textContent = c.campaign_id || '—';
+    const openBtn = document.getElementById('openDetailBtn');
+    openBtn.href = 'campaign-detail.php?id=' + c.id;
+    openBtn.style.display = 'inline-flex';
     new bootstrap.Modal(document.getElementById('campaignModal')).show();
 }
 
@@ -273,13 +279,25 @@ document.getElementById('campaignModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('cId').value = '';
     document.getElementById('campaignModalTitle').textContent = 'New Campaign';
     document.getElementById('idPreview').textContent = '—';
+    document.getElementById('openDetailBtn').style.display = 'none';
 });
 
 document.getElementById('campaignForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    const isNew = !document.getElementById('cId').value;
     fetch('api/campaign_crud.php', { method: 'POST', body: new FormData(this) })
         .then(r => r.json())
-        .then(res => { if (res.success) location.reload(); else alert(res.message || 'Error'); });
+        .then(res => {
+            if (res.success) {
+                if (isNew && res.id) {
+                    window.location = 'campaign-detail.php?id=' + res.id;
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert(res.message || 'Error');
+            }
+        });
 });
 
 function deleteCampaign(id, name) {

@@ -32,12 +32,21 @@ $overdue = $db->query("
     LIMIT 20
 ");
 
-// Pending my approval
+// Pending approvals — role-aware
+$role = $_SESSION['user_role'] ?? '';
+if (in_array($role, ['Admin','Project Head'])) {
+    $pendingWhere = "a.approved_project_head='Pending'";
+} elseif ($role === 'Manager') {
+    $pendingWhere = "a.approved_manager='Pending'";
+} else {
+    // Regular users: only their own assets awaiting approval (so they know what's blocked)
+    $pendingWhere = "(a.approved_project_head='Pending' OR a.approved_manager='Pending') AND (a.owner_id=$uid OR a.created_by=$uid)";
+}
 $pending = $db->query("
     SELECT a.id, a.asset_id AS a_code, a.asset_name, a.asset_type, a.due_date,
            a.approved_project_head, a.approved_manager
     FROM assets a
-    WHERE (a.approved_project_head='Pending' OR a.approved_manager='Pending')
+    WHERE ($pendingWhere)
       AND a.status NOT IN ('Cancelled')
     ORDER BY a.due_date ASC
     LIMIT 20
@@ -162,7 +171,10 @@ $priorityBadge = ['High'=>'danger','Medium'=>'warning','Low'=>'secondary','Criti
 <div class="card">
     <div class="card-header bg-white py-2">
         <span class="fw-semibold" style="font-size:.88rem;">
-            <i class="fa fa-clock me-1 text-warning"></i> Pending Approvals
+            <i class="fa fa-clock me-1 text-warning"></i>
+            <?php if (in_array($role,['Admin','Project Head'])): ?>Awaiting My PH Approval
+            <?php elseif ($role==='Manager'): ?>Awaiting My Manager Approval
+            <?php else: ?>My Assets Pending Approval<?php endif; ?>
         </span>
     </div>
     <div class="card-body p-0">
