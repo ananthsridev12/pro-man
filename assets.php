@@ -353,8 +353,6 @@ function editAsset(a) {
     document.getElementById('aPubDate').value    = a.pub_date || '';
     document.getElementById('aPriority').value   = a.priority || 'Medium';
     document.getElementById('aStatus').value     = a.status || 'Briefed';
-    document.getElementById('aApprPH').value     = a.approved_project_head || 'Pending';
-    document.getElementById('aApprMgr').value    = a.approved_manager || 'Pending';
     document.getElementById('aRevNo').value      = a.revision_no || 0;
     document.getElementById('aFinalUrl').value   = a.final_file_url || '';
     document.getElementById('aFeedback').value   = a.feedback_notes || '';
@@ -409,7 +407,10 @@ function openActivity(id, name) {
 
 function loadActivity(id) {
     fetch('api/comment_crud.php?action=fetch&id=' + id)
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(res => {
             if (!res.success) return;
             const d = res.data;
@@ -434,17 +435,33 @@ function loadActivity(id) {
                     ${a.old_value ? `<span class="text-danger">${escHtml(a.old_value)}</span> → ` : ''}
                     <span class="text-success">${escHtml(a.new_value||'')}</span></span>
                   </div>`).join('');
+        })
+        .catch(err => {
+            document.getElementById('commentsList').innerHTML =
+                '<p class="text-danger text-center py-2" style="font-size:.8rem;">Could not load comments.</p>';
+            console.error('loadActivity error:', err);
         });
 }
 
 function submitComment() {
     const txt = document.getElementById('commentInput').value.trim();
     if (!txt || !activeAssetId) return;
+    const btn = event.currentTarget;
+    btn.disabled = true;
     const fd = new FormData();
     fd.append('action','add'); fd.append('entity_id',activeAssetId); fd.append('comment_text',txt);
-    fetch('api/comment_crud.php',{method:'POST',body:fd})
-        .then(r=>r.json())
-        .then(res=>{ if(res.success){ document.getElementById('commentInput').value=''; loadActivity(activeAssetId); }});
+    fetch('api/comment_crud.php', { method:'POST', body:fd })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                document.getElementById('commentInput').value = '';
+                loadActivity(activeAssetId);
+            } else {
+                alert(res.message || 'Could not post comment.');
+            }
+        })
+        .catch(() => alert('Network error — comment not saved.'))
+        .finally(() => { btn.disabled = false; });
 }
 
 function escHtml(s) {

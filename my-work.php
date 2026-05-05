@@ -34,7 +34,7 @@ $overdue = $db->query("
 
 // Pending approvals — pipeline-based
 $role = $_SESSION['user_role'] ?? '';
-$roleEsc = addslashes($role);
+$roleEsc = $db->real_escape_string($role);
 $pending = $db->query("
     SELECT ai.id AS instance_id, ai.current_stage_order, ast.stage_name,
            c.id AS camp_id, c.campaign_name, c.campaign_id AS camp_code,

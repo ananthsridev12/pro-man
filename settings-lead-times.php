@@ -7,7 +7,7 @@ $db = getDB();
 
 $rows = $db->query("SELECT * FROM asset_lead_times ORDER BY id ASC");
 $leadTimes = [];
-if ($rows) while ($r = $rows->fetch_assoc()) $leadTimes[$r['asset_type']] = (int)$r['days_before_golive'];
+if ($rows !== false) while ($r = $rows->fetch_assoc()) $leadTimes[$r['asset_type']] = (int)$r['days_before_golive'];
 
 include 'includes/header.php';
 ?>

@@ -41,7 +41,7 @@ $activeUsers = $db->query("SELECT id, name, role FROM users WHERE status='active
 // Lead times
 $leadTimes = [];
 $ltRes = $db->query("SELECT asset_type, days_before_golive FROM asset_lead_times");
-if ($ltRes) while ($lt = $ltRes->fetch_assoc()) $leadTimes[$lt['asset_type']] = (int)$lt['days_before_golive'];
+if ($ltRes !== false) while ($lt = $ltRes->fetch_assoc()) $leadTimes[$lt['asset_type']] = (int)$lt['days_before_golive'];
 
 // Approval state
 $approvalStatus   = $campaign['approval_status'] ?? 'Draft';
@@ -51,7 +51,8 @@ $canSubmit        = false;
 $canApprove       = false;
 $pendingAction    = null;
 
-$inst = $db->query("SELECT * FROM approval_instances WHERE entity_type='campaign' AND entity_id=$id ORDER BY id DESC LIMIT 1")->fetch_assoc();
+$instRes = $db->query("SELECT * FROM approval_instances WHERE entity_type='campaign' AND entity_id=$id ORDER BY id DESC LIMIT 1");
+$inst = ($instRes !== false && $instRes->num_rows > 0) ? $instRes->fetch_assoc() : null;
 if ($inst) {
     $approvalInstance = $inst;
     $iid = (int)$inst['id'];
@@ -164,8 +165,8 @@ include 'includes/header.php';
 
 <!-- Approval Status Bar -->
 <?php
-$apBg    = ['Draft'=>'#f3f4f6','Submitted'=>'#dbeafe','Approved'=>'#dcfce7','Rejected'=>'#fee2e2'];
-$apColor = ['Draft'=>'#6b7280','Submitted'=>'#1d4ed8','Approved'=>'#15803d','Rejected'=>'#dc2626'];
+$apBg    = ['Draft'=>'#f3f4f6','Submitted'=>'#dbeafe','In Review'=>'#fef9c3','Approved'=>'#dcfce7','Rejected'=>'#fee2e2'];
+$apColor = ['Draft'=>'#6b7280','Submitted'=>'#1d4ed8','In Review'=>'#a16207','Approved'=>'#15803d','Rejected'=>'#dc2626'];
 $apStatusKey = preg_replace('/\s*\(.*\)/','',$approvalStatus); // strip "(Stage N of M)"
 ?>
 <div class="card mb-4">
